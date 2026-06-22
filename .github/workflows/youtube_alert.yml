@@ -32,4 +32,5 @@ jobs:
           touch seen_ids.txt
           git add seen_ids.txt
           git diff --cached --quiet || git commit -m "update seen_ids"
+          git pull --rebase origin main
           git push
