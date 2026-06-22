@@ -28,6 +28,8 @@ def search_youtube():
         "key": YOUTUBE_API_KEY,
     }
     res = requests.get(url, params=params)
+    print(f"[DEBUG] YouTube API 응답: {res.status_code}")
+    print(f"[DEBUG] 응답 내용: {res.json()}")
     return res.json().get("items", [])
 
 def send_telegram(title, video_id, channel):
