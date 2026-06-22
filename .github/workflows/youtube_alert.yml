@@ -11,28 +11,21 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Python 설정
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-      - name: 패키지 설치
-        run: pip install requests
-
+      - run: pip install requests
       - name: 알림 실행
         env:
-          YOUTUBE_API_KEY:  ${{ secrets.YOUTUBE_API_KEY }}
-          TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python checker.py
-
-- name: seen_ids.txt 커밋
+      - name: 저장
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
