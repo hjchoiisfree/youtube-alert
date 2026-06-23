@@ -1,5 +1,6 @@
-import os
+pythonimport os
 import requests
+from datetime import datetime, timezone
 
 YOUTUBE_API_KEY = os.environ["YOUTUBE_API_KEY"]
 TELEGRAM_TOKEN  = os.environ["TELEGRAM_TOKEN"]
@@ -28,15 +29,21 @@ def search_youtube():
         "key": YOUTUBE_API_KEY,
     }
     res = requests.get(url, params=params)
-    print(f"[DEBUG] YouTube API 응답: {res.status_code}")
-    print(f"[DEBUG] 응답 내용: {res.json()}")
     return res.json().get("items", [])
 
-def send_telegram(title, video_id, channel):
+def format_date(published_at):
+    dt = datetime.strptime(published_at, "%Y-%m-%dT%H:%M:%SZ")
+    dt = dt.replace(tzinfo=timezone.utc)
+    kst = dt.astimezone(tz=None)
+    return kst.strftime("%Y년 %m월 %d일 %H:%M")
+
+def send_telegram(title, video_id, channel, published_at):
+    date_str = format_date(published_at)
     text = (
         f"🎬 *이선엽 대표* 새 영상!\n\n"
         f"*{title}*\n"
         f"채널: {channel}\n"
+        f"📅 업로드: {date_str}\n"
         f"https://www.youtube.com/watch?v={video_id}"
     )
     requests.post(
@@ -50,12 +57,13 @@ def main():
     new_count = 0
 
     for item in videos:
-        vid_id  = item["id"]["videoId"]
-        title   = item["snippet"]["title"]
-        channel = item["snippet"]["channelTitle"]
+        vid_id       = item["id"]["videoId"]
+        title        = item["snippet"]["title"]
+        channel      = item["snippet"]["channelTitle"]
+        published_at = item["snippet"]["publishedAt"]
 
         if vid_id not in seen:
-            send_telegram(title, vid_id, channel)
+            send_telegram(title, vid_id, channel, published_at)
             save_seen_id(vid_id)
             new_count += 1
             print(f"[NEW] {title}")
