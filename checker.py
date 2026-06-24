@@ -62,6 +62,11 @@ def main():
         channel      = item["snippet"]["channelTitle"]
         published_at = item["snippet"]["publishedAt"]
 
+        # 제목에 "이선엽" 포함된 영상만 알림
+        if "이선엽" not in title:
+            print(f"[SKIP-필터] {title}")
+            continue
+
         if vid_id not in seen:
             send_telegram(title, vid_id, channel, published_at)
             save_seen_id(vid_id)
