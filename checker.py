@@ -53,6 +53,7 @@ def send_telegram(title, video_id, channel, published_at):
 
 def main():
     seen = get_seen_ids()
+    print(f"[INFO] 이미 본 영상 수: {len(seen)}")
     videos = search_youtube()
     new_count = 0
 
