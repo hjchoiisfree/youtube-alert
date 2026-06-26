@@ -37,15 +37,7 @@ def format_date(published_at):
     kst = dt.astimezone(tz=None)
     return kst.strftime("%Y년 %m월 %d일 %H:%M")
 
-def send_telegram(title, video_id, channel, published_at):
-    date_str = format_date(published_at)
-    text = (
-        f"🎬 *이선엽 대표* 새 영상!\n\n"
-        f"*{title}*\n"
-        f"채널: {channel}\n"
-        f"📅 업로드: {date_str}\n"
-        f"https://www.youtube.com/watch?v={video_id}"
-    )
+def send_telegram(text):
     requests.post(
         f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
         json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "Markdown"},
@@ -53,7 +45,6 @@ def send_telegram(title, video_id, channel, published_at):
 
 def main():
     seen = get_seen_ids()
-    print(f"[INFO] 이미 본 영상 수: {len(seen)}")
     videos = search_youtube()
     new_count = 0
 
@@ -63,20 +54,32 @@ def main():
         channel      = item["snippet"]["channelTitle"]
         published_at = item["snippet"]["publishedAt"]
 
-        # 제목에 "이선엽" 포함된 영상만 알림
         if "이선엽" not in title:
             print(f"[SKIP-필터] {title}")
             continue
 
         if vid_id not in seen:
-            send_telegram(title, vid_id, channel, published_at)
+            date_str = format_date(published_at)
+            text = (
+                f"🎬 *이선엽 대표* 새 영상!\n\n"
+                f"*{title}*\n"
+                f"채널: {channel}\n"
+                f"📅 업로드: {date_str}\n"
+                f"https://www.youtube.com/watch?v={video_id}"
+            )
+            send_telegram(text)
             save_seen_id(vid_id)
             new_count += 1
             print(f"[NEW] {title}")
         else:
             print(f"[SKIP] {title}")
 
-    print(f"완료: 신규 {new_count}건 알림 발송")
+    if new_count == 0:
+        now = datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
+        send_telegram(f"✅ 이선엽 대표 새 영상 없음\n({now} 기준)")
+        print("완료: 신규 영상 없음 알림 발송")
+    else:
+        print(f"완료: 신규 {new_count}건 알림 발송")
 
 if __name__ == "__main__":
     main()
