@@ -65,7 +65,7 @@ def main():
                 f"*{title}*\n"
                 f"채널: {channel}\n"
                 f"📅 업로드: {date_str}\n"
-                f"https://www.youtube.com/watch?v={video_id}"
+                f"https://www.youtube.com/watch?v={vid_id}"
             )
             send_telegram(text)
             save_seen_id(vid_id)
