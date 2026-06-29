@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 from datetime import datetime, timezone
 
@@ -14,9 +15,9 @@ def get_seen_ids():
     with open(SEEN_FILE, "r") as f:
         return set(line.strip() for line in f if line.strip())
 
-def save_seen_id(video_id):
+def save_seen_id(vid_id):
     with open(SEEN_FILE, "a") as f:
-        f.write(video_id + "\n")
+        f.write(vid_id + "\n")
 
 def search_youtube():
     url = "https://www.googleapis.com/youtube/v3/search"
@@ -30,6 +31,31 @@ def search_youtube():
     }
     res = requests.get(url, params=params)
     return res.json().get("items", [])
+
+def get_duration(vid_id):
+    url = "https://www.googleapis.com/youtube/v3/videos"
+    params = {
+        "part": "contentDetails",
+        "id": vid_id,
+        "key": YOUTUBE_API_KEY,
+    }
+    res = requests.get(url, params=params)
+    items = res.json().get("items", [])
+    if not items:
+        return "알 수 없음"
+    duration = items[0]["contentDetails"]["duration"]
+    match = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", duration)
+    if not match:
+        return "알 수 없음"
+    hours   = int(match.group(1) or 0)
+    minutes = int(match.group(2) or 0)
+    seconds = int(match.group(3) or 0)
+    if hours > 0:
+        return f"{hours}시간 {minutes:02d}분 {seconds:02d}초"
+    elif minutes > 0:
+        return f"{minutes}분 {seconds:02d}초"
+    else:
+        return f"{seconds}초"
 
 def format_date(published_at):
     dt = datetime.strptime(published_at, "%Y-%m-%dT%H:%M:%SZ")
@@ -59,12 +85,14 @@ def main():
             continue
 
         if vid_id not in seen:
-            date_str = format_date(published_at)
+            date_str     = format_date(published_at)
+            duration_str = get_duration(vid_id)
             text = (
                 f"🎬 *이선엽 대표* 새 영상!\n\n"
                 f"*{title}*\n"
                 f"채널: {channel}\n"
                 f"📅 업로드: {date_str}\n"
+                f"⏱ 길이: {duration_str}\n"
                 f"https://www.youtube.com/watch?v={vid_id}"
             )
             send_telegram(text)
