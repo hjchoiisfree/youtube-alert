@@ -3,9 +3,10 @@ import re
 import requests
 from datetime import datetime, timezone
 
-YOUTUBE_API_KEY = os.environ["YOUTUBE_API_KEY"]
-TELEGRAM_TOKEN  = os.environ["TELEGRAM_TOKEN"]
-TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
+YOUTUBE_API_KEY   = os.environ["YOUTUBE_API_KEY"]
+TELEGRAM_TOKEN    = os.environ["TELEGRAM_TOKEN"]
+TELEGRAM_CHAT_ID  = os.environ["TELEGRAM_CHAT_ID"]
+ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 SEEN_FILE = "seen_ids.txt"
 KEYWORD = "이선엽"
 
@@ -57,6 +58,47 @@ def get_duration(vid_id):
     else:
         return f"{seconds}초"
 
+def get_subtitle(vid_id):
+    try:
+        from youtube_transcript_api import YouTubeTranscriptApi
+        transcript = YouTubeTranscriptApi.get_transcript(vid_id, languages=["ko", "en"])
+        text = " ".join([t["text"] for t in transcript])
+        return text[:4000]
+    except Exception as e:
+        print(f"[자막 없음] {e}")
+        return None
+
+def summarize_with_claude(title, subtitle_text):
+    if not subtitle_text:
+        return "자막 없음 — 요약 불가"
+    headers = {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    body = {
+        "model": "claude-sonnet-4-6",
+        "max_tokens": 1000,
+        "messages": [
+            {
+                "role": "user",
+                "content": (
+                    f"다음은 YouTube 영상 \"{title}\"의 자막입니다.\n\n"
+                    f"{subtitle_text}\n\n"
+                    "당신은 주식 투자자입니다. 이선엽 대표의 발언 중 투자자 관점에서 주목해야 할 포인트를 아래 형식으로 작성해주세요.\n\n"
+                    "📌 핵심 투자 포인트 (2~3개)\n"
+                    "- 각 포인트는 구체적인 종목/섹터/매크로 시그널 위주로\n\n"
+                    "⚠️ 주의해야 할 리스크 (1~2개)\n"
+                    "- 이선엽 대표가 언급한 위험 요소\n\n"
+                    "한국어로 간결하게 작성해주세요."
+                ),
+            }
+        ],
+    }
+    res = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=body)
+    data = res.json()
+    return data["content"][0]["text"]
+
 def format_date(published_at):
     dt = datetime.strptime(published_at, "%Y-%m-%dT%H:%M:%SZ")
     dt = dt.replace(tzinfo=timezone.utc)
@@ -87,12 +129,16 @@ def main():
         if vid_id not in seen:
             date_str     = format_date(published_at)
             duration_str = get_duration(vid_id)
+            subtitle     = get_subtitle(vid_id)
+            summary      = summarize_with_claude(title, subtitle)
+
             text = (
                 f"🎬 *이선엽 대표* 새 영상!\n\n"
                 f"*{title}*\n"
                 f"채널: {channel}\n"
                 f"📅 업로드: {date_str}\n"
-                f"⏱ 길이: {duration_str}\n"
+                f"⏱ 길이: {duration_str}\n\n"
+                f"📝 *투자 포인트*\n{summary}\n\n"
                 f"https://www.youtube.com/watch?v={vid_id}"
             )
             send_telegram(text)
