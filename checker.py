@@ -3,10 +3,10 @@ import re
 import requests
 from datetime import datetime, timezone
 
-YOUTUBE_API_KEY   = os.environ["YOUTUBE_API_KEY"]
-TELEGRAM_TOKEN    = os.environ["TELEGRAM_TOKEN"]
-TELEGRAM_CHAT_ID  = os.environ["TELEGRAM_CHAT_ID"]
-ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+YOUTUBE_API_KEY  = os.environ["YOUTUBE_API_KEY"]
+TELEGRAM_TOKEN   = os.environ["TELEGRAM_TOKEN"]
+TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
+GEMINI_API_KEY   = os.environ["GEMINI_API_KEY"]
 SEEN_FILE = "seen_ids.txt"
 KEYWORD = "이선엽"
 
@@ -58,78 +58,29 @@ def get_duration(vid_id):
     else:
         return f"{seconds}초"
 
-def get_subtitle(vid_id):
-    try:
-        # 한국어 자막 시도
-        url = f"https://www.youtube.com/api/timedtext?v={vid_id}&lang=ko&fmt=json3"
-        res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-        if res.status_code == 200 and res.text.strip():
-            data = res.json()
-            events = data.get("events", [])
-            texts = []
-            for e in events:
-                for s in e.get("segs", []):
-                    t = s.get("utf8", "").strip()
-                    if t and t != "\n":
-                        texts.append(t)
-            text = " ".join(texts)
-            if text:
-                print(f"[자막 성공] {len(text)}자")
-                return text[:4000]
-
-        # 영어 자막 시도
-        url_en = f"https://www.youtube.com/api/timedtext?v={vid_id}&lang=en&fmt=json3"
-        res_en = requests.get(url_en, headers={"User-Agent": "Mozilla/5.0"})
-        if res_en.status_code == 200 and res_en.text.strip():
-            data = res_en.json()
-            events = data.get("events", [])
-            texts = []
-            for e in events:
-                for s in e.get("segs", []):
-                    t = s.get("utf8", "").strip()
-                    if t and t != "\n":
-                        texts.append(t)
-            text = " ".join(texts)
-            if text:
-                print(f"[영어 자막 성공] {len(text)}자")
-                return text[:4000]
-
-        print("[자막 없음] 자막을 찾을 수 없음")
-        return None
-    except Exception as e:
-        print(f"[자막 오류] {e}")
-        return None
-
-def summarize_with_claude(title, subtitle_text):
-    if not subtitle_text:
-        return "자막 없음 — 요약 불가"
-    headers = {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-    }
+def summarize_with_gemini(vid_id, title):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    video_url = f"https://www.youtube.com/watch?v={vid_id}"
+    prompt = (
+        f"다음 YouTube 영상을 분석해주세요: {video_url}\n\n"
+        f"영상 제목: {title}\n\n"
+        "당신은 주식 투자자입니다. 이선엽 대표의 발언 중 투자자 관점에서 주목해야 할 포인트를 아래 형식으로 작성해주세요.\n\n"
+        "📌 핵심 투자 포인트 (2~3개)\n"
+        "- 각 포인트는 구체적인 종목/섹터/매크로 시그널 위주로\n\n"
+        "⚠️ 주의해야 할 리스크 (1~2개)\n"
+        "- 이선엽 대표가 언급한 위험 요소\n\n"
+        "한국어로 간결하게 작성해주세요."
+    )
     body = {
-        "model": "claude-sonnet-4-6",
-        "max_tokens": 1000,
-        "messages": [
-            {
-                "role": "user",
-                "content": (
-                    f"다음은 YouTube 영상 \"{title}\"의 자막입니다.\n\n"
-                    f"{subtitle_text}\n\n"
-                    "당신은 주식 투자자입니다. 이선엽 대표의 발언 중 투자자 관점에서 주목해야 할 포인트를 아래 형식으로 작성해주세요.\n\n"
-                    "📌 핵심 투자 포인트 (2~3개)\n"
-                    "- 각 포인트는 구체적인 종목/섹터/매크로 시그널 위주로\n\n"
-                    "⚠️ 주의해야 할 리스크 (1~2개)\n"
-                    "- 이선엽 대표가 언급한 위험 요소\n\n"
-                    "한국어로 간결하게 작성해주세요."
-                ),
-            }
-        ],
+        "contents": [{"parts": [{"text": prompt}]}]
     }
-    res = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=body)
+    res = requests.post(url, json=body)
     data = res.json()
-    return data["content"][0]["text"]
+    try:
+        return data["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception as e:
+        print(f"[Gemini 오류] {e} / 응답: {data}")
+        return "요약 실패"
 
 def format_date(published_at):
     dt = datetime.strptime(published_at, "%Y-%m-%dT%H:%M:%SZ")
@@ -161,8 +112,7 @@ def main():
         if vid_id not in seen:
             date_str     = format_date(published_at)
             duration_str = get_duration(vid_id)
-            subtitle     = get_subtitle(vid_id)
-            summary      = summarize_with_claude(title, subtitle)
+            summary      = summarize_with_gemini(vid_id, title)
 
             text = (
                 f"🎬 *이선엽 대표* 새 영상!\n\n"
