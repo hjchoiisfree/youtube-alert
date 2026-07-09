@@ -97,9 +97,10 @@ def get_transcript(vid_id):
 
 def summarize_with_gemini(vid_id, title, transcript):
     """transcript가 있으면 자막 기반, 없으면 제목 기반(환각 위험)으로 요약."""
+    # gemini-1.5-flash는 종료됨(404). 항상 최신 Flash를 가리키는 별칭 사용.
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        f"gemini-flash-latest:generateContent?key={GEMINI_API_KEY}"
     )
 
     if transcript:
@@ -131,13 +132,25 @@ def summarize_with_gemini(vid_id, title, transcript):
     )
 
     body = {"contents": [{"parts": [{"text": prompt}]}]}
-    res = requests.post(url, json=body)
-    data = res.json()
+    try:
+        res = requests.post(url, json=body, timeout=60)
+        data = res.json()
+    except Exception as e:
+        print(f"[Gemini 요청 오류] {e}")
+        return "요약 실패 (Gemini 요청 오류)"
+
+    # API가 에러를 반환한 경우(모델명 오류, 키 오류, 쿼터 등) 사유를 남김
+    if "error" in data:
+        msg = data["error"].get("message", "알 수 없는 오류")
+        print(f"[Gemini API 오류] {msg}")
+        return f"요약 실패 ({msg[:80]})"
+
     try:
         return data["candidates"][0]["content"]["parts"][0]["text"]
     except Exception as e:
-        print(f"[Gemini 오류] {e} / 응답: {data}")
-        return "요약 실패"
+        # 안전필터 차단 등으로 candidates가 비는 경우
+        print(f"[Gemini 파싱 오류] {e} / 응답: {data}")
+        return "요약 실패 (응답 파싱 불가)"
 
 
 def format_date(published_at):
