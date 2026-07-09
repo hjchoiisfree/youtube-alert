@@ -60,12 +60,44 @@ def get_duration(vid_id):
 
 def get_subtitle(vid_id):
     try:
-        from youtube_transcript_api import YouTubeTranscriptApi
-        transcript = YouTubeTranscriptApi.get_transcript(vid_id, languages=["ko", "en"])
-        text = " ".join([t["text"] for t in transcript])
-        return text[:4000]
+        # 한국어 자막 시도
+        url = f"https://www.youtube.com/api/timedtext?v={vid_id}&lang=ko&fmt=json3"
+        res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+        if res.status_code == 200 and res.text.strip():
+            data = res.json()
+            events = data.get("events", [])
+            texts = []
+            for e in events:
+                for s in e.get("segs", []):
+                    t = s.get("utf8", "").strip()
+                    if t and t != "\n":
+                        texts.append(t)
+            text = " ".join(texts)
+            if text:
+                print(f"[자막 성공] {len(text)}자")
+                return text[:4000]
+
+        # 영어 자막 시도
+        url_en = f"https://www.youtube.com/api/timedtext?v={vid_id}&lang=en&fmt=json3"
+        res_en = requests.get(url_en, headers={"User-Agent": "Mozilla/5.0"})
+        if res_en.status_code == 200 and res_en.text.strip():
+            data = res_en.json()
+            events = data.get("events", [])
+            texts = []
+            for e in events:
+                for s in e.get("segs", []):
+                    t = s.get("utf8", "").strip()
+                    if t and t != "\n":
+                        texts.append(t)
+            text = " ".join(texts)
+            if text:
+                print(f"[영어 자막 성공] {len(text)}자")
+                return text[:4000]
+
+        print("[자막 없음] 자막을 찾을 수 없음")
+        return None
     except Exception as e:
-        print(f"[자막 없음] {e}")
+        print(f"[자막 오류] {e}")
         return None
 
 def summarize_with_claude(title, subtitle_text):
