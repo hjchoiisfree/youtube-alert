@@ -32,7 +32,7 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           touch seen_ids.txt
-          git add seen_ids.txt archive/
-          git diff --cached --quiet || git commit -m "update seen_ids and archive"
+          git add seen_ids.txt archive/ 관점_종합.md
+          git diff --cached --quiet || git commit -m "update seen_ids, archive, 관점_종합"
           git pull --rebase origin main
           git push
