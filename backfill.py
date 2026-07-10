@@ -5,6 +5,10 @@
 - 텔레그램 발송 안 함 (조용히 저장만)
 - 처리한 영상 ID를 seen_ids.txt에도 기록 → 일상 봇이 재처리 안 함
 - 중간에 끊겨도 다시 실행하면 남은 것부터 이어서 처리
+
+checker.py의 함수를 그대로 재사용하므로 같은 폴더에 있어야 함.
+실행: 필요한 환경변수(YOUTUBE_API_KEY, GEMINI_API_KEY, SUPADATA_API_KEY) 필요.
+      (TELEGRAM_TOKEN, TELEGRAM_CHAT_ID는 checker import를 위해 필요하지만 발송엔 안 씀)
 """
 import os
 import time
@@ -17,18 +21,23 @@ PUBLISHED_AFTER = "2026-01-01T00:00:00Z"
 PUBLISHED_BEFORE = "2027-01-01T00:00:00Z"
 YOUTUBE_API_KEY = os.environ["YOUTUBE_API_KEY"]
 
-SLEEP_BETWEEN = 5  # 요약 요청 사이 간격(초) - Gemini 한도 보호
+# 요약 요청 사이 간격(초) - Gemini 무료 한도(RPM) 보호용
+SLEEP_BETWEEN = 5
 
 
 def search_all_2026():
+    """2026년 '이선엽' 영상을 페이지네이션으로 모두 수집."""
     url = "https://www.googleapis.com/youtube/v3/search"
     items = []
     page_token = None
     calls = 0
     while True:
         params = {
-            "part": "snippet", "q": KEYWORD, "type": "video",
-            "order": "date", "maxResults": 50,
+            "part": "snippet",
+            "q": KEYWORD,
+            "type": "video",
+            "order": "date",
+            "maxResults": 50,
             "publishedAfter": PUBLISHED_AFTER,
             "publishedBefore": PUBLISHED_BEFORE,
             "key": YOUTUBE_API_KEY,
@@ -48,6 +57,7 @@ def main():
     seen = checker.get_seen_ids()
     videos = search_all_2026()
 
+    # 제목에 '이선엽' 포함 + 아직 처리 안 한 것만
     todo = [
         it for it in videos
         if "이선엽" in it["snippet"]["title"]
@@ -71,14 +81,18 @@ def main():
         date_str     = checker.format_date(published_at)
         duration_str = checker.get_duration(vid_id)
 
+        # 자막 추출 (Supadata 우선)
         transcript, fail_reason = checker.get_transcript(vid_id)
 
+        # 자막 없으면 건너뛰기 (방침: 자막 있는 것만 아카이브)
         if not transcript:
             print(f"   → 자막 없음({fail_reason}), 건너뜀")
             skipped += 1
+            # seen에는 넣어서 다음 실행 때 또 시도하지 않게 함
             checker.save_seen_id(vid_id)
             continue
 
+        # 요약
         summary = checker.summarize_with_gemini(title, transcript)
         if summary.startswith("요약 실패"):
             print(f"   → {summary}, 이번엔 건너뜀(다음 실행 때 재시도)")
@@ -88,6 +102,7 @@ def main():
 
         tags = checker.extract_topics(title, transcript)
 
+        # 아카이브 저장 (텔레그램 발송 없음)
         checker.save_archive(vid_id, title, channel, date_str, duration_str,
                              summary, transcript, tags, True)
         checker.save_seen_id(vid_id)
@@ -103,3 +118,4 @@ def main():
 
 
 if __name__ == "__main__":
+    main()
