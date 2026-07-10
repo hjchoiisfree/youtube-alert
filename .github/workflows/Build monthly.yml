@@ -1,0 +1,36 @@
+name: 월별 관점 통합 (1회성)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install requests youtube-transcript-api
+      - name: 월별 통합 실행
+        env:
+          YOUTUBE_API_KEY:  ${{ secrets.YOUTUBE_API_KEY }}
+          TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GEMINI_API_KEY:   ${{ secrets.GEMINI_API_KEY }}
+          SUPADATA_API_KEY: ${{ secrets.SUPADATA_API_KEY }}
+        run: python build_monthly.py
+      - name: 저장
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add 관점_종합.md 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "build monthly perspective"
+          git pull --rebase origin main
+          git push
