@@ -188,7 +188,7 @@ def summarize_with_gemini(title, transcript):
     """transcript가 있으면 자막 기반, 없으면 제목 기반(환각 위험)으로 요약."""
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-2.5-flash-lite:generateContent?key={GEMINI_API_KEY}"
+        f"gemini-3.1-flash-lite:generateContent?key={GEMINI_API_KEY}"
     )
 
     if transcript:
