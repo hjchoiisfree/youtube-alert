@@ -377,14 +377,21 @@ PERSPECTIVE_FILE = "관점_종합.md"
 MIN_DURATION_SEC = 600  # 10분 = 600초
 
 
-def update_perspective(title, date_str, tags, summary):
-    """관점_종합.md를 롤링 방식으로 갱신하고, 갱신본을 반환.
-    이선엽이 주목한 섹터/테마를 누적 기록."""
-    # 기존 종합본 읽기 (없으면 빈 문자열)
+def update_perspective(new_items):
+    """관점_종합.md를 롤링 갱신. new_items는 이번에 새로 처리한
+    영상들의 (title, date_str, tags, summary) 리스트.
+    시장 종합 + 추천 섹터/종목 두 카테고리로 작성. 갱신본 반환."""
     prev = ""
     if os.path.exists(PERSPECTIVE_FILE):
         with open(PERSPECTIVE_FILE, "r", encoding="utf-8") as f:
             prev = f.read()
+
+    # 이번에 새로 추가된 영상 요약들을 하나로 합침
+    new_block = ""
+    for (title, date_str, tags, summary) in new_items:
+        new_block += (
+            f"\n\n=== 신규 영상: {title} ({date_str}) [{', '.join(tags)}] ===\n{summary}"
+        )
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -392,21 +399,24 @@ def update_perspective(title, date_str, tags, summary):
     )
     prompt = (
         "당신은 이선엽 대표의 시장 관점을 누적 정리하는 애널리스트입니다.\n"
-        "아래 [기존 종합]에 [새 영상 요약]의 내용을 반영해, 이선엽이 주목한 "
-        "섹터·테마 중심으로 종합본을 갱신하세요.\n\n"
+        "아래 [기존 종합]에 [이번 신규 영상들]의 내용을 반영해 종합본을 갱신하세요.\n\n"
+        "반드시 아래 두 카테고리로 나눠 마크다운으로 작성하세요:\n\n"
+        "## 📊 시장 종합\n"
+        "- 이선엽이 현재 시장 전체를 보는 큰 그림(강세/약세 판단, 핵심 변수, 주요 논리).\n"
+        "- 관점이 시간에 따라 어떻게 바뀌었는지 날짜와 함께 흐름이 보이게 정리.\n\n"
+        "## 🎯 추천 섹터·종목\n"
+        "- 이선엽이 반복해서 주목한 섹터·테마를 상위에 정리(언제 언급했는지 날짜 포함).\n"
+        "- 이선엽은 개별 종목 추천을 하지 않습니다. 그가 실제로 이름을 언급한 종목이 있으면 "
+        "'추천'이 아니라 '언급된 맥락' 그대로만 기록하세요. 매수 신호처럼 각색 금지.\n\n"
         "규칙:\n"
-        "- '이선엽이 주목한 섹터·테마'를 핵심으로 기재. 각 섹터별로 언제(날짜) 어떤 맥락으로 "
-        "언급했는지 짧게 누적하세요.\n"
-        "- 같은 섹터가 반복되면 최신 내용을 덧붙이되 오래된 것도 날짜와 함께 남겨 흐름이 보이게 하세요.\n"
-        "- 이선엽은 개별 종목 추천을 하지 않습니다. 실제 언급한 섹터/테마만, 그가 말한 맥락 그대로 기록하세요.\n"
-        "- 전체가 너무 길어지면 오래되고 더 이상 언급 안 되는 항목은 요약 압축하세요.\n"
-        "- 마크다운으로, 섹터별 소제목과 날짜 붙은 불릿으로 작성하세요.\n\n"
-        f"[기존 종합]\n{prev if prev else '(아직 없음 - 처음부터 작성)'}\n\n"
-        f"[새 영상 요약]\n제목: {title}\n날짜: {date_str}\n태그: {', '.join(tags)}\n\n{summary}"
+        "- 같은 섹터/주제가 반복되면 최신 내용을 덧붙이되 과거도 날짜와 함께 남겨 흐름을 보존하세요.\n"
+        "- 너무 오래되고 더 이상 언급 안 되는 항목은 압축하세요.\n\n"
+        f"[기존 종합]\n{prev if prev else '(아직 없음 - 처음부터 작성)'}\n"
+        f"\n[이번 신규 영상들]{new_block}"
     )
     body = {"contents": [{"parts": [{"text": prompt}]}]}
     try:
-        res = requests.post(url, json=body, timeout=90)
+        res = requests.post(url, json=body, timeout=120)
         data = res.json()
         updated = data["candidates"][0]["content"]["parts"][0]["text"]
     except Exception as e:
@@ -423,6 +433,7 @@ def main():
     seen = get_seen_ids()
     videos = search_youtube()
     new_count = 0
+    new_items = []  # 이번에 처리한 (title, date_str, tags, summary)
 
     for item in videos:
         vid_id       = item["id"]["videoId"]
@@ -462,33 +473,34 @@ def main():
         save_archive(vid_id, title, channel, date_str, duration_str,
                      summary, transcript, tags, True)
 
-        # 관점_종합 갱신 (섹터/테마 누적)
-        updated_perspective = update_perspective(title, date_str, tags, summary)
-
-        # 텔레그램: 관점_종합을 보냄
+        # 개별 영상 요약 메시지 발송
         tag_line = " ".join(f"#{t}" for t in tags) if tags else ""
-        if updated_perspective:
-            persp_msg = (
-                f"🧭 *이선엽 관점_종합 업데이트*\n"
-                f"(방금 반영: {title})\n"
-                f"📅 {date_str}  {tag_line}\n\n"
-                f"{updated_perspective[:3500]}\n\n"
-                f"_※ AI 생성 참고 정보이며 투자 조언이 아닙니다._"
-            )
-        else:
-            # 갱신 실패 시 최소한 이번 영상 요약이라도 발송
-            persp_msg = (
-                f"🎬 *이선엽 대표* 새 영상 · 노트 추가됨\n\n"
-                f"*{title}*\n채널: {channel}\n"
-                f"📅 {date_str}  ⏱ {duration_str}\n{tag_line}\n\n"
-                f"{summary}\n\n"
-                f"_※ AI 생성 참고 정보이며 투자 조언이 아닙니다._\n"
-                f"https://www.youtube.com/watch?v={vid_id}"
-            )
-        send_telegram(persp_msg)
+        video_msg = (
+            f"🎬 *이선엽 대표* 새 영상 · 노트 추가됨\n\n"
+            f"*{title}*\n채널: {channel}\n"
+            f"📅 {date_str}  ⏱ {duration_str}\n{tag_line}\n\n"
+            f"{summary}\n\n"
+            f"_※ AI 생성 참고 정보이며 투자 조언이 아닙니다._\n"
+            f"https://www.youtube.com/watch?v={vid_id}"
+        )
+        send_telegram(video_msg)
+
+        new_items.append((title, date_str, tags, summary))
         save_seen_id(vid_id)
         new_count += 1
         print(f"[NEW] {title}")
+
+    # 루프 종료 후: 신규 영상이 있으면 종합 관점을 별도 메시지 1개로 발송
+    if new_count > 0:
+        updated = update_perspective(new_items)
+        if updated:
+            persp_msg = (
+                f"🧭 *이선엽 관점 종합* (신규 {new_count}건 반영)\n\n"
+                f"{updated[:3800]}\n\n"
+                f"_※ AI 생성 참고 정보이며 투자 조언이 아닙니다._"
+            )
+            send_telegram(persp_msg)
+            print("[관점 종합 메시지 발송]")
 
     if new_count == 0:
         now = datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
