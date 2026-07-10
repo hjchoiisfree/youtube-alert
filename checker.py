@@ -92,6 +92,24 @@ def get_duration(vid_id):
         return f"{seconds}초"
 
 
+def get_duration_seconds(vid_id):
+    """영상 길이를 초 단위 정수로 반환 (길이 필터용). 실패 시 -1."""
+    url = "https://www.googleapis.com/youtube/v3/videos"
+    params = {"part": "contentDetails", "id": vid_id, "key": YOUTUBE_API_KEY}
+    res = requests.get(url, params=params)
+    items = res.json().get("items", [])
+    if not items:
+        return -1
+    duration = items[0]["contentDetails"]["duration"]
+    match = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", duration)
+    if not match:
+        return -1
+    h = int(match.group(1) or 0)
+    m = int(match.group(2) or 0)
+    s = int(match.group(3) or 0)
+    return h * 3600 + m * 60 + s
+
+
 # ────────────────────────────────────────────────
 # 자막 추출: Supadata(서버 기반, IP 차단 없음) 우선 → 라이브러리 백업
 # ────────────────────────────────────────────────
@@ -218,8 +236,11 @@ def summarize_with_gemini(title, transcript):
         "### 🧭 이선엽의 관점·논리\n"
         "- 그가 시장을 어떤 프레임으로 보는지, 어떤 근거로 그렇게 판단하는지 2~3개\n\n"
         "### 🎙 진행자 Q & 이선엽 A\n"
-        "- 이선엽 대표는 보통 게스트로 출연해 진행자의 질문에 답하는 형식입니다.\n"
-        "- 자막에서 진행자의 핵심 질문과 이선엽의 답변을 뽑아 'Q. 질문 / A. 답변' 형태로 3~5쌍 정리하세요.\n"
+        "- 이선엽 대표는 보통 게스트로 출연해 진행자의 질문에 답하지만, 진행자 없이 "
+        "혼자 말하는 영상(숏폼 등)도 있습니다.\n"
+        "- **중요: 자막에 실제로 진행자의 질문이 있을 때만** 'Q. 질문 / A. 답변' 형태로 정리하세요. "
+        "질문이 없는데 있는 것처럼 지어내지 마세요.\n"
+        "- 자막에 진행자 질문이 전혀 없으면 이 섹션에는 '진행자 질문 없음 (단독 발언 영상)'이라고만 쓰세요.\n"
         "- 답변은 핵심만 요약하되, 중요한 문장은 **볼드** 처리하세요.\n\n"
         "### 🎯 이선엽이 주목한 섹터·테마\n"
         "- 이선엽 대표는 보통 개별 종목 추천은 하지 않습니다. 그가 실제로 긍정적으로 "
@@ -352,6 +373,52 @@ def send_telegram(text):
     )
 
 
+PERSPECTIVE_FILE = "관점_종합.md"
+MIN_DURATION_SEC = 600  # 10분 = 600초
+
+
+def update_perspective(title, date_str, tags, summary):
+    """관점_종합.md를 롤링 방식으로 갱신하고, 갱신본을 반환.
+    이선엽이 주목한 섹터/테마를 누적 기록."""
+    # 기존 종합본 읽기 (없으면 빈 문자열)
+    prev = ""
+    if os.path.exists(PERSPECTIVE_FILE):
+        with open(PERSPECTIVE_FILE, "r", encoding="utf-8") as f:
+            prev = f.read()
+
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"gemini-3.1-flash-lite:generateContent?key={GEMINI_API_KEY}"
+    )
+    prompt = (
+        "당신은 이선엽 대표의 시장 관점을 누적 정리하는 애널리스트입니다.\n"
+        "아래 [기존 종합]에 [새 영상 요약]의 내용을 반영해, 이선엽이 주목한 "
+        "섹터·테마 중심으로 종합본을 갱신하세요.\n\n"
+        "규칙:\n"
+        "- '이선엽이 주목한 섹터·테마'를 핵심으로 기재. 각 섹터별로 언제(날짜) 어떤 맥락으로 "
+        "언급했는지 짧게 누적하세요.\n"
+        "- 같은 섹터가 반복되면 최신 내용을 덧붙이되 오래된 것도 날짜와 함께 남겨 흐름이 보이게 하세요.\n"
+        "- 이선엽은 개별 종목 추천을 하지 않습니다. 실제 언급한 섹터/테마만, 그가 말한 맥락 그대로 기록하세요.\n"
+        "- 전체가 너무 길어지면 오래되고 더 이상 언급 안 되는 항목은 요약 압축하세요.\n"
+        "- 마크다운으로, 섹터별 소제목과 날짜 붙은 불릿으로 작성하세요.\n\n"
+        f"[기존 종합]\n{prev if prev else '(아직 없음 - 처음부터 작성)'}\n\n"
+        f"[새 영상 요약]\n제목: {title}\n날짜: {date_str}\n태그: {', '.join(tags)}\n\n{summary}"
+    )
+    body = {"contents": [{"parts": [{"text": prompt}]}]}
+    try:
+        res = requests.post(url, json=body, timeout=90)
+        data = res.json()
+        updated = data["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception as e:
+        print(f"[관점_종합 갱신 오류] {e}")
+        return None
+
+    with open(PERSPECTIVE_FILE, "w", encoding="utf-8") as f:
+        f.write(updated)
+    print("[관점_종합 갱신 완료]")
+    return updated
+
+
 def main():
     seen = get_seen_ids()
     videos = search_youtube()
@@ -371,39 +438,57 @@ def main():
             print(f"[SKIP] {title}")
             continue
 
+        # 10분 미만 영상(숏폼 등)은 요약하지 않고 건너뜀
+        dur_sec = get_duration_seconds(vid_id)
+        if 0 <= dur_sec < MIN_DURATION_SEC:
+            print(f"[SKIP-길이] {title} ({dur_sec}초 < 10분)")
+            save_seen_id(vid_id)  # 다음 실행 때 또 안 걸리게 기록
+            continue
+
         date_str     = format_date(published_at)
         duration_str = get_duration(vid_id)
 
         transcript, fail_reason = get_transcript(vid_id)
+        # 자막 없으면 요약/아카이브 안 함 (자막 있는 것만)
+        if not transcript:
+            print(f"[SKIP-자막없음] {title} ({fail_reason})")
+            save_seen_id(vid_id)
+            continue
+
         summary = summarize_with_gemini(title, transcript)
         tags = extract_topics(title, transcript)
-        has_transcript = bool(transcript)
 
         # 아카이브에 노트 저장 (누적)
         save_archive(vid_id, title, channel, date_str, duration_str,
-                     summary, transcript, tags, has_transcript)
+                     summary, transcript, tags, True)
 
-        # 텔레그램은 가벼운 알림 + 요약
-        if has_transcript:
-            source_note = "🟢 자막 기반"
-        else:
-            source_note = f"🟡 제목 기반 추정 ({fail_reason})"
+        # 관점_종합 갱신 (섹터/테마 누적)
+        updated_perspective = update_perspective(title, date_str, tags, summary)
+
+        # 텔레그램: 관점_종합을 보냄
         tag_line = " ".join(f"#{t}" for t in tags) if tags else ""
-
-        text = (
-            f"🎬 *이선엽 대표* 새 영상 · 노트 추가됨\n\n"
-            f"*{title}*\n"
-            f"채널: {channel}\n"
-            f"📅 {date_str}  ⏱ {duration_str}\n"
-            f"{source_note}   {tag_line}\n\n"
-            f"{summary}\n\n"
-            f"_※ AI 생성 참고 정보이며 투자 조언이 아닙니다._\n"
-            f"https://www.youtube.com/watch?v={vid_id}"
-        )
-        send_telegram(text)
+        if updated_perspective:
+            persp_msg = (
+                f"🧭 *이선엽 관점_종합 업데이트*\n"
+                f"(방금 반영: {title})\n"
+                f"📅 {date_str}  {tag_line}\n\n"
+                f"{updated_perspective[:3500]}\n\n"
+                f"_※ AI 생성 참고 정보이며 투자 조언이 아닙니다._"
+            )
+        else:
+            # 갱신 실패 시 최소한 이번 영상 요약이라도 발송
+            persp_msg = (
+                f"🎬 *이선엽 대표* 새 영상 · 노트 추가됨\n\n"
+                f"*{title}*\n채널: {channel}\n"
+                f"📅 {date_str}  ⏱ {duration_str}\n{tag_line}\n\n"
+                f"{summary}\n\n"
+                f"_※ AI 생성 참고 정보이며 투자 조언이 아닙니다._\n"
+                f"https://www.youtube.com/watch?v={vid_id}"
+            )
+        send_telegram(persp_msg)
         save_seen_id(vid_id)
         new_count += 1
-        print(f"[NEW] {title} ({'자막' if has_transcript else '제목기반'})")
+        print(f"[NEW] {title}")
 
     if new_count == 0:
         now = datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
