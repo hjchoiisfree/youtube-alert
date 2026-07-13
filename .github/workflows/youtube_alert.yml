@@ -2,6 +2,8 @@ name: YouTube 이선엽 알림
 
 on:
   schedule:
+    # UTC 09:12 = KST 18:12 (오후 6시 12분)
+    # 정각(분=0)은 전 세계 워크플로우가 몰려 지연이 심하므로 어중간한 분 사용
     - cron: "12 9 * * *"
   workflow_dispatch:
 
