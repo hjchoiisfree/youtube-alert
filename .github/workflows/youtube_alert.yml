@@ -2,7 +2,7 @@ name: YouTube 이선엽 알림
 
 on:
   schedule:
-    - cron: "0 9 * * *"
+    - cron: "12 9 * * *"
   workflow_dispatch:
 
 permissions:
