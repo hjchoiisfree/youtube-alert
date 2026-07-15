@@ -3,6 +3,12 @@ name: YouTube 이선엽 알림
 on:
   workflow_dispatch:
 
+# 외부 cron(예: cron-job.org)이 workflow_dispatch를 호출하는 구조.
+# 실행이 겹치면 git push 충돌이 날 수 있어 동시 실행을 막는다.
+concurrency:
+  group: youtube-alert
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
