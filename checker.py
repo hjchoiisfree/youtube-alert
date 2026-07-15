@@ -2,7 +2,9 @@ import os
 import re
 import time
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+
+KST = timezone(timedelta(hours=9))  # 한국 시간 (GitHub Actions 러너는 UTC라서 명시 필요)
 
 # 백업용 라이브러리 (Supadata 실패 시 시도). 없어도 동작하도록 방어.
 try:
@@ -309,7 +311,7 @@ def save_archive(vid_id, title, channel, date_str, duration_str,
     """영상별 Markdown 노트를 archive/ 폴더에 저장."""
     os.makedirs(ARCHIVE_DIR, exist_ok=True)
 
-    date_prefix = datetime.now().strftime("%Y-%m-%d")
+    date_prefix = datetime.now(KST).strftime("%Y-%m-%d")
     m = re.match(r"(\d{4})년 (\d{2})월 (\d{2})일", date_str)
     if m:
         date_prefix = f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
@@ -362,7 +364,7 @@ def save_archive(vid_id, title, channel, date_str, duration_str,
 def format_date(published_at):
     dt = datetime.strptime(published_at, "%Y-%m-%dT%H:%M:%SZ")
     dt = dt.replace(tzinfo=timezone.utc)
-    kst = dt.astimezone(tz=None)
+    kst = dt.astimezone(KST)
     return kst.strftime("%Y년 %m월 %d일 %H:%M")
 
 
@@ -503,7 +505,7 @@ def main():
             print("[관점 종합 메시지 발송]")
 
     if new_count == 0:
-        now = datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
+        now = datetime.now(KST).strftime("%Y년 %m월 %d일 %H:%M")
         send_telegram(f"✅ 이선엽 대표 새 영상 없음\n({now} 기준)")
         print("완료: 신규 영상 없음 알림 발송")
     else:
