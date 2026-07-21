@@ -55,18 +55,55 @@ def save_seen_id(vid_id):
         f.write(vid_id + "\n")
 
 
+# 검색 범위: 최근 N일 이내 영상을 페이지 넘기며 전부 수집
+LOOKBACK_DAYS = 14
+# 쿼터 보호용 최대 페이지 수 (1페이지=50개, 검색 1회당 쿼터 100 소모)
+MAX_SEARCH_PAGES = 3
+
+
 def search_youtube():
+    """'이선엽' 검색 결과를 최신순으로 페이지 넘기며 수집한다.
+    최근 LOOKBACK_DAYS일 이내 영상만, 최대 MAX_SEARCH_PAGES 페이지(150개)까지."""
     url = "https://www.googleapis.com/youtube/v3/search"
-    params = {
-        "part": "snippet",
-        "q": KEYWORD,
-        "type": "video",
-        "order": "date",
-        "maxResults": 10,
-        "key": YOUTUBE_API_KEY,
-    }
-    res = requests.get(url, params=params)
-    return res.json().get("items", [])
+    published_after = (
+        datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    all_items = []
+    page_token = None
+    for page in range(MAX_SEARCH_PAGES):
+        params = {
+            "part": "snippet",
+            "q": KEYWORD,
+            "type": "video",
+            "order": "date",
+            "maxResults": 50,
+            "publishedAfter": published_after,
+            "key": YOUTUBE_API_KEY,
+        }
+        if page_token:
+            params["pageToken"] = page_token
+
+        try:
+            res = requests.get(url, params=params, timeout=30)
+            data = res.json()
+        except Exception as e:
+            print(f"[검색 오류] {page+1}페이지: {e}")
+            break
+
+        if "error" in data:
+            print(f"[검색 API 오류] {data['error'].get('message', '')[:80]}")
+            break
+
+        items = data.get("items", [])
+        all_items.extend(items)
+        print(f"[검색] {page+1}페이지: {len(items)}건 (누적 {len(all_items)}건)")
+
+        page_token = data.get("nextPageToken")
+        if not page_token or not items:
+            break  # 더 이상 페이지 없음 → 기간 내 영상 전부 수집 완료
+
+    return all_items
 
 
 def get_full_description(vid_id):
