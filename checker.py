@@ -1,5 +1,6 @@
 import os
 import re
+import html
 import time
 import requests
 from datetime import datetime, timezone, timedelta
@@ -66,6 +67,35 @@ def search_youtube():
     }
     res = requests.get(url, params=params)
     return res.json().get("items", [])
+
+
+def get_full_description(vid_id):
+    """videos API로 영상의 전체 설명란을 가져온다.
+    (search API의 snippet.description은 앞부분만 잘려서 오기 때문에,
+    출연자 목록이 설명 뒷부분에 있는 경우를 놓치지 않기 위함)"""
+    url = "https://www.googleapis.com/youtube/v3/videos"
+    params = {"part": "snippet", "id": vid_id, "key": YOUTUBE_API_KEY}
+    try:
+        res = requests.get(url, params=params, timeout=30)
+        items = res.json().get("items", [])
+        if not items:
+            return ""
+        return items[0]["snippet"].get("description", "")
+    except Exception as e:
+        print(f"[설명 조회 오류] {vid_id}: {e}")
+        return ""
+
+
+def matches_keyword(title, snippet_desc, vid_id):
+    """제목 → 검색결과 요약 설명 → 전체 설명 순으로 키워드를 검사한다.
+    전체 설명 조회(API 1회)는 앞 두 단계에서 못 찾았을 때만 수행."""
+    if KEYWORD in title:
+        return True
+    if KEYWORD in snippet_desc:
+        return True
+    # 제목/요약 설명엔 없지만 검색엔 걸린 경우 → 전체 설명에서 최종 확인
+    # (예: KBS 라디오처럼 출연자 이름이 설명란에만 있는 영상)
+    return KEYWORD in get_full_description(vid_id)
 
 
 def get_duration(vid_id):
@@ -439,16 +469,20 @@ def main():
 
     for item in videos:
         vid_id       = item["id"]["videoId"]
-        title        = item["snippet"]["title"]
+        # YouTube API는 제목의 특수문자를 &#39; 같은 HTML 엔티티로 반환할 수 있어 디코딩
+        title        = html.unescape(item["snippet"]["title"])
         channel      = item["snippet"]["channelTitle"]
         published_at = item["snippet"]["publishedAt"]
+        snippet_desc = item["snippet"].get("description", "")
 
-        if "이선엽" not in title:
-            print(f"[SKIP-필터] {title}")
-            continue
-
+        # 제목뿐 아니라 설명란(출연자 목록 등)까지 검사.
+        # 이미 본 영상(seen)은 API 호출 아끼기 위해 필터 전에 먼저 거른다.
         if vid_id in seen:
             print(f"[SKIP] {title}")
+            continue
+
+        if not matches_keyword(title, snippet_desc, vid_id):
+            print(f"[SKIP-필터] {title}")
             continue
 
         # 10분 미만 영상(숏폼 등)은 요약하지 않고 건너뜀
