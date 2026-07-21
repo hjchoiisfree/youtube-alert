@@ -123,16 +123,54 @@ def get_full_description(vid_id):
         return ""
 
 
+def verify_appearance_with_gemini(title, description):
+    """설명란에서만 '이선엽'이 발견된 애매한 경우, 실제 출연 영상인지 판별.
+    설명란의 추천 영상 링크·해시태그에만 이름이 있는 가짜 매칭을 걸러낸다.
+    반환: True(출연) / False(미출연). API 오류 시 True(놓치는 것보다 안전)."""
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"gemini-3.1-flash-lite:generateContent?key={GEMINI_API_KEY}"
+    )
+    prompt = (
+        "당신은 YouTube 영상 필터입니다. 아래 영상에 증권 애널리스트 '이선엽' 대표가 "
+        "실제로 출연(발언자/게스트/진행자)하는지 판단하세요.\n\n"
+        "판단 규칙:\n"
+        "- 제목이나 설명란의 출연자 소개에 이선엽이 있으면 YES.\n"
+        "- 설명란의 '추천 영상', '지난 방송', '관련 영상' 링크 목록이나 해시태그, "
+        "채널 상용구에만 이선엽이 등장하고 이 영상 자체에는 다른 사람이 출연하면 NO.\n"
+        "- 제목에 다른 출연자 이름이 명시돼 있고 이선엽은 링크에만 보이면 NO.\n\n"
+        f"[제목] {title}\n\n[설명란]\n{description[:3000]}\n\n"
+        "반드시 YES 또는 NO 한 단어로만 답하세요."
+    )
+    body = {"contents": [{"parts": [{"text": prompt}]}]}
+    try:
+        res = requests.post(url, json=body, timeout=60)
+        data = res.json()
+        answer = data["candidates"][0]["content"]["parts"][0]["text"].strip().upper()
+        verdict = answer.startswith("YES")
+        print(f"[출연검증] {title[:40]} → {answer[:10]}")
+        return verdict
+    except Exception as e:
+        print(f"[출연검증 오류] {e} → 일단 통과 처리")
+        return True
+
+
 def matches_keyword(title, snippet_desc, vid_id):
-    """제목 → 검색결과 요약 설명 → 전체 설명 순으로 키워드를 검사한다.
-    전체 설명 조회(API 1회)는 앞 두 단계에서 못 찾았을 때만 수행."""
+    """제목 → 설명란 순으로 키워드를 검사한다.
+    제목 매칭은 확실하므로 즉시 통과.
+    설명란에서만 발견되면 추천 링크 등에 이름만 있는 경우일 수 있어
+    Gemini로 실제 출연 여부를 한 번 더 검증한다."""
     if KEYWORD in title:
         return True
-    if KEYWORD in snippet_desc:
-        return True
-    # 제목/요약 설명엔 없지만 검색엔 걸린 경우 → 전체 설명에서 최종 확인
-    # (예: KBS 라디오처럼 출연자 이름이 설명란에만 있는 영상)
-    return KEYWORD in get_full_description(vid_id)
+
+    # 전체 설명란 확보 (search API의 snippet.description은 잘려서 와서
+    # 링크 목록인지 출연자 소개인지 문맥 판단이 어려움 → 전체를 가져온다)
+    description = get_full_description(vid_id) or snippet_desc
+    if KEYWORD not in description:
+        return False
+
+    # 설명란에만 이름이 있는 애매한 경우 → 출연 여부 검증
+    return verify_appearance_with_gemini(title, description)
 
 
 def get_duration(vid_id):
