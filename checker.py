@@ -473,15 +473,116 @@ def format_date(published_at):
     return kst.strftime("%Y년 %m월 %d일 %H:%M")
 
 
+def to_telegram(md):
+    """마크다운을 텔레그램 레거시 Markdown이 이해하는 형태로 변환.
+    텔레그램은 ##/### 헤더와 **볼드**를 지원하지 않는다(후자는 파싱 오류 유발)."""
+    if not md:
+        return md
+    out = []
+    for line in md.split("\n"):
+        s = line.strip()
+        if s.startswith("#"):                       # ### 제목 → *제목*
+            t = s.lstrip("#").strip()
+            out.append(f"*{t}*" if t else "")
+            continue
+        if set(s) <= {"-", "─", "="} and len(s) >= 3:  # --- 구분선 제거
+            out.append("")
+            continue
+        line = re.sub(r"\*\*(.+?)\*\*", r"*\1*", line)  # **볼드** → *볼드*
+        out.append(line)
+    text = "\n".join(out)
+    text = re.sub(r"\n{3,}", "\n\n", text)          # 빈 줄 3개 이상 압축
+    return text.strip()
+
+
+def clip(text, limit=3800):
+    """텔레그램 길이 제한에 맞춰 자르되, 문장/줄 중간에서 끊지 않는다."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    nl = cut.rfind("\n")
+    if nl > limit * 0.7:
+        cut = cut[:nl]
+    return cut.rstrip() + "\n\n…(이하 생략)"
+
+
 def send_telegram(text):
-    requests.post(
-        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-        json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "Markdown"},
-    )
+    """Markdown으로 시도하고, 파싱 오류가 나면 서식 없이 재전송한다.
+    (서식 하나 깨졌다고 알림 자체를 놓치는 일을 막기 위함)"""
+    api = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    try:
+        res = requests.post(
+            api,
+            json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "Markdown"},
+            timeout=30,
+        )
+        if res.status_code == 200:
+            return True
+        print(f"[텔레그램 오류 {res.status_code}] {res.text[:120]} → 평문 재시도")
+    except Exception as e:
+        print(f"[텔레그램 요청 오류] {e} → 평문 재시도")
+
+    try:
+        res = requests.post(
+            api, json={"chat_id": TELEGRAM_CHAT_ID, "text": text}, timeout=30
+        )
+        return res.status_code == 200
+    except Exception as e:
+        print(f"[텔레그램 재시도 실패] {e}")
+        return False
 
 
 PERSPECTIVE_FILE = "관점_종합.md"
 MIN_DURATION_SEC = 600  # 10분 = 600초
+
+
+def normalize_dates(text):
+    """LLM이 프롬프트 규칙을 어겨도 날짜 표기를 강제로 통일한다.
+    (26-07-31) → `07.31` / (26-07) → `07월` / (26-01~08) → `01~08월`
+    올해 날짜는 연도 생략, 작년 이전은 'YY.MM' 유지."""
+    if not text:
+        return text
+
+    yy = datetime.now(KST).year % 100  # 26
+
+    def _pick(y, m, d=None):
+        """연도(2자리 int) 기준으로 표기 결정."""
+        if y != yy:                       # 작년 이전 → 연도 유지
+            return f"`{y:02d}.{m:02d}`" if d is None else f"`{y:02d}.{m:02d}.{d:02d}`"
+        return f"`{m:02d}월`" if d is None else f"`{m:02d}.{d:02d}`"
+
+    def _range(mo):
+        y = int(mo.group(1)[-2:])
+        m1, m2 = int(mo.group(2)), int(mo.group(3))
+        head = "" if y == yy else f"{y:02d}년 "
+        return f"`{head}{m1:02d}~{m2:02d}월`"
+
+    out = []
+    for line in text.split("\n"):
+        # 제목 줄(#)은 '2026년 8월' 같은 표기를 유지해야 하므로 건드리지 않는다
+        if line.lstrip().startswith("#"):
+            out.append(line)
+            continue
+
+        # 1) (26-01~08) → `01~08월`
+        line = re.sub(r"\(?\b(\d{2}|\d{4})-(\d{1,2})\s*~\s*(\d{1,2})\)?", _range, line)
+        # 2) (26-07-31) → `07.31`
+        line = re.sub(
+            r"\(?\b(\d{2}|\d{4})-(\d{1,2})-(\d{1,2})\)?",
+            lambda mo: _pick(int(mo.group(1)[-2:]), int(mo.group(2)), int(mo.group(3))),
+            line,
+        )
+        # 3) (26-07) → `07월`   ※ 위 두 패턴이 먼저 소비되므로 남은 것만 매칭
+        line = re.sub(
+            r"\(?\b(\d{2}|\d{4})-(\d{1,2})\)?(?![\d~-])",
+            lambda mo: _pick(int(mo.group(1)[-2:]), int(mo.group(2))),
+            line,
+        )
+        # 4) 백틱 중복 제거 (``07.31`` → `07.31`)
+        line = re.sub(r"`{2,}([^`]+)`{2,}", r"`\1`", line)
+        out.append(line)
+
+    return "\n".join(out)
 
 
 def update_perspective(new_items):
@@ -504,20 +605,44 @@ def update_perspective(new_items):
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"gemini-3.1-flash-lite:generateContent?key={GEMINI_API_KEY}"
     )
+    this_year = datetime.now(KST).year
+
     prompt = (
         "당신은 이선엽 대표의 시장 관점을 누적 정리하는 애널리스트입니다.\n"
         "아래 [기존 종합]에 [이번 신규 영상들]의 내용을 반영해 종합본을 갱신하세요.\n\n"
-        "반드시 아래 두 카테고리로 나눠 마크다운으로 작성하세요:\n\n"
+        # ── 날짜 표기 규칙 (가장 중요) ──────────────────
+        "■ 날짜 표기 규칙 (반드시 지킬 것)\n"
+        f"- 올해는 {this_year}년입니다. 올해 날짜는 연도를 쓰지 마세요.\n"
+        "- 특정 하루  → `08.01`   (백틱 포함, MM.DD)\n"
+        "- 특정 한 달 → `07월`    (백틱 포함, MM월)\n"
+        "- 여러 달    → `01~08월` (백틱 포함, MM~MM월)\n"
+        f"- 작년 이전만 연도 2자리를 붙입니다 → `{str(this_year - 1)[2:]}.12`\n"
+        "- 날짜는 **항목의 맨 앞**에 두세요. 문장 끝 괄호에 넣지 마세요.\n"
+        "  올바른 예: - `08.01` 미·중 패권 전쟁의 본질\n"
+        "  틀린 예:   - 미·중 패권 전쟁의 본질 (26-08-01)\n"
+        "- `26-07-31`, `(26-01~08)`, `2026-08-01` 같은 옛 형식이 [기존 종합]에 남아 있으면 "
+        "위 규칙대로 **전부 고쳐서** 다시 쓰세요.\n"
+        "- 한 항목에 날짜는 하나만. 제목과 본문에 중복해서 넣지 마세요.\n\n"
+        # ── 배지 ──────────────────────────────────────
+        "■ 배지\n"
+        "- 이번 신규 영상에서 새로 나온 내용에는 제목 끝에 🆕\n"
+        "- 3개월 이상 반복해서 언급된 항목에는 제목 끝에 ⭐지속\n\n"
+        # ── 본문 구조 ─────────────────────────────────
+        "■ 본문 구조\n"
+        "반드시 아래 두 카테고리로 나눠 마크다운으로 작성하세요.\n"
+        "각 항목은 `날짜` + 한 줄 제목 → 줄바꿈 → 설명 2줄 이내 형태로 쓰세요.\n\n"
         "## 📊 시장 종합\n"
         "- 이선엽이 현재 시장 전체를 보는 큰 그림(강세/약세 판단, 핵심 변수, 주요 논리).\n"
-        "- 관점이 시간에 따라 어떻게 바뀌었는지 날짜와 함께 흐름이 보이게 정리.\n\n"
+        "- 관점이 시간에 따라 어떻게 바뀌었는지 흐름이 보이게, 최신 항목을 위에 두세요.\n\n"
         "## 🎯 추천 섹터·종목\n"
-        "- 이선엽이 반복해서 주목한 섹터·테마를 상위에 정리(언제 언급했는지 날짜 포함).\n"
+        "- 이선엽이 반복해서 주목한 섹터·테마를 상위에 정리.\n"
+        "- '언급 맥락'이라는 라벨은 쓰지 말고, 날짜 뒤에 바로 내용을 쓰세요.\n"
         "- 이선엽은 개별 종목 추천을 하지 않습니다. 그가 실제로 이름을 언급한 종목이 있으면 "
         "'추천'이 아니라 '언급된 맥락' 그대로만 기록하세요. 매수 신호처럼 각색 금지.\n\n"
-        "규칙:\n"
+        "■ 그 밖의 규칙\n"
         "- 같은 섹터/주제가 반복되면 최신 내용을 덧붙이되 과거도 날짜와 함께 남겨 흐름을 보존하세요.\n"
-        "- 너무 오래되고 더 이상 언급 안 되는 항목은 압축하세요.\n\n"
+        "- 너무 오래되고 더 이상 언급 안 되는 항목은 압축하세요.\n"
+        "- 제목 줄(#)은 `# 📅 {연도}년 {월}월 종합 (누적 갱신)` 하나만 쓰세요.\n\n"
         f"[기존 종합]\n{prev if prev else '(아직 없음 - 처음부터 작성)'}\n"
         f"\n[이번 신규 영상들]{new_block}"
     )
@@ -529,6 +654,9 @@ def update_perspective(new_items):
     except Exception as e:
         print(f"[관점_종합 갱신 오류] {e}")
         return None
+
+    # 모델이 규칙을 어겼을 경우를 대비한 강제 정규화
+    updated = normalize_dates(updated)
 
     with open(PERSPECTIVE_FILE, "w", encoding="utf-8") as f:
         f.write(updated)
@@ -590,7 +718,7 @@ def main():
             f"🎬 *이선엽 대표* 새 영상 · 노트 추가됨\n\n"
             f"*{title}*\n채널: {channel}\n"
             f"📅 {date_str}  ⏱ {duration_str}\n{tag_line}\n\n"
-            f"{summary}\n\n"
+            f"{clip(to_telegram(summary))}\n\n"
             f"_※ AI 생성 참고 정보이며 투자 조언이 아닙니다._\n"
             f"https://www.youtube.com/watch?v={vid_id}"
         )
@@ -607,7 +735,7 @@ def main():
         if updated:
             persp_msg = (
                 f"🧭 *이선엽 관점 종합* (신규 {new_count}건 반영)\n\n"
-                f"{updated[:3800]}\n\n"
+                f"{clip(to_telegram(updated))}\n\n"
                 f"_※ AI 생성 참고 정보이며 투자 조언이 아닙니다._"
             )
             send_telegram(persp_msg)
