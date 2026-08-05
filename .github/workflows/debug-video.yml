@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: Fetch video metadata
         env:
-          KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          KEY: ${{ YOUTUBE_API_KEY }}
           VID: ${{ github.event.inputs.video_id }}
         run: |
           echo "현재 UTC: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
