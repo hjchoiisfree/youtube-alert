@@ -1,0 +1,35 @@
+yaml
+name: debug-video
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_id:
+        description: '확인할 영상 ID'
+        required: true
+        default: 'FdCmgrZh310'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch video metadata
+        env:
+          KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          VID: ${{ github.event.inputs.video_id }}
+        run: |
+          echo "현재 UTC: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "24h 전 UTC: $(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
+          echo "---"
+          curl -s "https://www.googleapis.com/youtube/v3/videos?part=snippet,liveStreamingDetails&id=${VID}&key=${KEY}" \
+            | jq '.items[0] | {
+                title: .snippet.title,
+                channelTitle: .snippet.channelTitle,
+                channelId: .snippet.channelId,
+                publishedAt: .snippet.publishedAt,
+                liveBroadcastContent: .snippet.liveBroadcastContent,
+                scheduledStartTime: .liveStreamingDetails.scheduledStartTime,
+                actualStartTime: .liveStreamingDetails.actualStartTime,
+                tags: .snippet.tags,
+                desc_head: .snippet.description[0:300]
+              }'
