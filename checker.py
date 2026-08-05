@@ -106,6 +106,102 @@ def search_youtube():
     return all_items
 
 
+# 이선엽 대표가 자주 출연하는 채널 (채널ID: 표시명)
+# 키워드 검색(search.list)은 제목·태그에 이름이 없는 영상을 놓치므로,
+# 주요 채널의 업로드 목록을 직접 훑어서 누락을 막는다.
+CHANNELS = {
+    "UCLv3v82YNNsa8EsxrcPMjGQ": "SBS 시사교양 라디오 - 시교라",
+    "UC6kZpTl39-_SqfBrF1-N2oQ": "연합뉴스경제TV",
+    "UCjEZlY8IQpvvmHDYmtMboEQ": "야전사령관 이선엽",
+    # 삼프로TV, 언더스탠딩 등 채널ID를 여기에 추가
+}
+
+# 채널당 조회할 최대 페이지 수 (1페이지=50개)
+MAX_CHANNEL_PAGES = 2
+
+
+def fetch_channel_uploads(channel_id, channel_name, cutoff_iso):
+    """채널 업로드 플레이리스트를 최신순으로 읽어 cutoff 이후 영상만 반환.
+    업로드 플레이리스트 ID는 채널ID의 'UC'를 'UU'로 바꾼 값이다.
+    playlistItems는 호출당 쿼터 1 (search.list는 100)이라 훨씬 저렴하다."""
+    playlist_id = "UU" + channel_id[2:]
+    url = "https://www.googleapis.com/youtube/v3/playlistItems"
+    out, page_token = [], None
+
+    for _ in range(MAX_CHANNEL_PAGES):
+        params = {
+            "part": "snippet,contentDetails",
+            "playlistId": playlist_id,
+            "maxResults": 50,
+            "key": YOUTUBE_API_KEY,
+        }
+        if page_token:
+            params["pageToken"] = page_token
+
+        try:
+            data = requests.get(url, params=params, timeout=30).json()
+        except Exception as e:
+            print(f"[채널 조회 오류] {channel_name}: {e}")
+            break
+
+        if "error" in data:
+            print(f"[채널 API 오류] {channel_name}: "
+                  f"{data['error'].get('message', '')[:80]}")
+            break
+
+        stop = False
+        for it in data.get("items", []):
+            pub = it["contentDetails"].get("videoPublishedAt", "")
+            if not pub:
+                continue
+            if pub < cutoff_iso:      # 최신순 정렬이므로 기간을 벗어나면 중단
+                stop = True
+                break
+            # search 결과와 같은 형태로 맞춰서 main()이 그대로 처리하게 함
+            out.append({
+                "id": {"videoId": it["contentDetails"]["videoId"]},
+                "snippet": {
+                    "title": it["snippet"]["title"],
+                    "channelTitle": channel_name,
+                    "publishedAt": pub,
+                    "description": it["snippet"].get("description", ""),
+                },
+                # playlistItems는 설명란 전체를 주므로 추가 조회가 불필요하다는 표시
+                "_full_desc": True,
+            })
+
+        if stop or not data.get("nextPageToken"):
+            break
+        page_token = data["nextPageToken"]
+
+    print(f"[채널] {channel_name}: {len(out)}건")
+    return out
+
+
+def collect_videos():
+    """키워드 검색 + 채널 순회를 합치고 videoId 기준으로 중복 제거."""
+    cutoff = (datetime.now(timezone.utc)
+              - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    merged, seen_vids = [], set()
+
+    for item in search_youtube():
+        vid = item["id"]["videoId"]
+        if vid not in seen_vids:
+            seen_vids.add(vid)
+            merged.append(item)
+
+    for cid, cname in CHANNELS.items():
+        for item in fetch_channel_uploads(cid, cname, cutoff):
+            vid = item["id"]["videoId"]
+            if vid not in seen_vids:
+                seen_vids.add(vid)
+                merged.append(item)
+
+    print(f"[수집 완료] 총 {len(merged)}건")
+    return merged
+
+
 def get_full_description(vid_id):
     """videos API로 영상의 전체 설명란을 가져온다.
     (search API의 snippet.description은 앞부분만 잘려서 오기 때문에,
@@ -155,7 +251,7 @@ def verify_appearance_with_gemini(title, description):
         return True
 
 
-def matches_keyword(title, snippet_desc, vid_id):
+def matches_keyword(title, snippet_desc, vid_id, desc_is_full=False):
     """제목 → 설명란 순으로 키워드를 검사한다.
     제목 매칭은 확실하므로 즉시 통과.
     설명란에서만 발견되면 추천 링크 등에 이름만 있는 경우일 수 있어
@@ -163,9 +259,14 @@ def matches_keyword(title, snippet_desc, vid_id):
     if KEYWORD in title:
         return True
 
-    # 전체 설명란 확보 (search API의 snippet.description은 잘려서 와서
-    # 링크 목록인지 출연자 소개인지 문맥 판단이 어려움 → 전체를 가져온다)
-    description = get_full_description(vid_id) or snippet_desc
+    if desc_is_full:
+        # 채널 순회 결과 → 이미 전체 설명란을 갖고 있어 추가 조회 불필요
+        description = snippet_desc
+    else:
+        # 전체 설명란 확보 (search API의 snippet.description은 잘려서 와서
+        # 링크 목록인지 출연자 소개인지 문맥 판단이 어려움 → 전체를 가져온다)
+        description = get_full_description(vid_id) or snippet_desc
+
     if KEYWORD not in description:
         return False
 
@@ -678,7 +779,7 @@ def update_perspective(new_items):
 
 def main():
     seen = get_seen_ids()
-    videos = search_youtube()
+    videos = collect_videos()
     new_count = 0
     new_items = []  # 이번에 처리한 (title, date_str, tags, summary)
 
@@ -689,6 +790,8 @@ def main():
         channel      = item["snippet"]["channelTitle"]
         published_at = item["snippet"]["publishedAt"]
         snippet_desc = item["snippet"].get("description", "")
+        # 채널 순회로 온 항목은 설명란이 이미 전체라 재조회가 필요 없다
+        desc_is_full = item.get("_full_desc", False)
 
         # 제목뿐 아니라 설명란(출연자 목록 등)까지 검사.
         # 이미 본 영상(seen)은 API 호출 아끼기 위해 필터 전에 먼저 거른다.
@@ -696,7 +799,7 @@ def main():
             print(f"[SKIP] {title}")
             continue
 
-        if not matches_keyword(title, snippet_desc, vid_id):
+        if not matches_keyword(title, snippet_desc, vid_id, desc_is_full):
             print(f"[SKIP-필터] {title}")
             continue
 
