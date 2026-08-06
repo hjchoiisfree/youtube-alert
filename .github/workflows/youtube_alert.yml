@@ -38,6 +38,9 @@ jobs:
           touch seen_ids.txt
           git add seen_ids.txt archive/
           git add 관점_종합.md 2>/dev/null || true
-          git diff --cached --quiet || git commit -m "update seen_ids, archive, 관점_종합"
+          git add channels.json 2>/dev/null || true
+          git add rejected.log 2>/dev/null || true
+          git add last_audit.txt 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "update seen_ids, archive, channels, 관점_종합"
           git pull --rebase origin main
           git push
