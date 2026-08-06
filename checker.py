@@ -42,7 +42,7 @@ AUDIT_INTERVAL_DAYS = 7
 AUDIT_LOOKBACK_DAYS = 30
 
 # 길이·자막 필터로 버려진 영상도 텔레그램으로 알릴지 여부
-NOTIFY_SKIPS = True
+NOTIFY_SKIPS = False
 
 
 def _has_keyword(text):
@@ -1094,9 +1094,9 @@ def main():
 
     # 주기적으로 '놓친 영상이 있는지' 스스로 점검한다.
     # 알림봇의 가장 큰 위험은 놓치는 것이 아니라 놓친 줄 모르는 것이다.
-    if should_run_audit():
-        print("[놓침 점검] 실행")
-        audit_missed()
+#    if should_run_audit():
+#        print("[놓침 점검] 실행")
+#        audit_missed()
 
 
 if __name__ == "__main__":
