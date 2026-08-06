@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import html
 import time
 import requests
@@ -24,6 +25,31 @@ SUPADATA_API_KEY = os.environ.get("SUPADATA_API_KEY", "")
 SEEN_FILE = "seen_ids.txt"
 ARCHIVE_DIR = "archive"
 KEYWORD = "이선엽"
+
+# 표기 흔들림·오타 대응. 실제로 채널 설명란에 '이선혁'으로 잘못 적힌 사례가 있었다.
+# 새 오타를 발견하면 여기에 추가한다.
+KEYWORD_VARIANTS = ["이선엽", "이선혁", "이 선엽", "이선 엽"]
+
+# 자동 학습된 출연 채널 목록 (git에 커밋되어 실행 간 유지된다)
+CHANNELS_FILE = "channels.json"
+# 필터에서 걸러진 영상 기록 (Gemini 오판 사후 검증용)
+REJECTED_LOG = "rejected.log"
+# 마지막 놓침 점검 실행일
+AUDIT_FILE = "last_audit.txt"
+
+# 놓침 점검 주기(일)와 조회 범위(일)
+AUDIT_INTERVAL_DAYS = 7
+AUDIT_LOOKBACK_DAYS = 30
+
+# 길이·자막 필터로 버려진 영상도 텔레그램으로 알릴지 여부
+NOTIFY_SKIPS = True
+
+
+def _has_keyword(text):
+    """키워드 변형 중 하나라도 포함되면 True."""
+    if not text:
+        return False
+    return any(k in text for k in KEYWORD_VARIANTS)
 
 # 요약에 넣을 자막 최대 길이 (토큰/비용 절약)
 MAX_TRANSCRIPT_CHARS = 20000
@@ -106,18 +132,68 @@ def search_youtube():
     return all_items
 
 
-# 이선엽 대표가 자주 출연하는 채널 (채널ID: 표시명)
-# 키워드 검색(search.list)은 제목·태그에 이름이 없는 영상을 놓치므로,
-# 주요 채널의 업로드 목록을 직접 훑어서 누락을 막는다.
+# 이선엽 대표가 자주 출연하는 채널 (채널ID: 표시명) — 수동 시드.
+# 여기에 없어도 키워드 검색으로 한 번 잡히면 channels.json에 자동 학습된다.
 CHANNELS = {
     "UCLv3v82YNNsa8EsxrcPMjGQ": "SBS 시사교양 라디오 - 시교라",
     "UC6kZpTl39-_SqfBrF1-N2oQ": "연합뉴스경제TV",
-    "UCjEZlY8IQpvvmHDYmtMboEQ": "야전사령관 이선엽",
-    # 삼프로TV, 언더스탠딩 등 채널ID를 여기에 추가
+    "UCD0k4Kq7SJROxxV-9N5v8IA": "깨비증권 마블TV [KB증권]",
 }
 
-# 채널당 조회할 최대 페이지 수 (1페이지=50개)
-MAX_CHANNEL_PAGES = 2
+# 채널당 조회할 최대 페이지 수 (1페이지=50개).
+# playlistItems는 호출당 쿼터 1이라 넉넉히 잡아도 부담이 없다.
+# 정치·뉴스 클립을 하루 수십 개 올리는 채널은 2페이지로는 14일을 못 채운다.
+MAX_CHANNEL_PAGES = 8
+
+
+def load_channels():
+    """수동 시드(CHANNELS) + 자동 학습분(channels.json)을 합쳐 반환."""
+    learned = {}
+    if os.path.exists(CHANNELS_FILE):
+        try:
+            with open(CHANNELS_FILE, encoding="utf-8") as f:
+                data = json.load(f)
+            learned = {cid: v.get("name", cid) for cid, v in data.items()}
+        except Exception as e:
+            print(f"[채널목록 로드 오류] {e}")
+
+    merged = dict(CHANNELS)
+    merged.update(learned)
+    return merged
+
+
+def learn_channel(channel_id, channel_name):
+    """출연이 확인된 영상의 채널을 자동 학습 목록에 기록한다.
+    이미 있으면 히트 수와 최근 출연일만 갱신한다."""
+    if not channel_id:
+        return
+
+    data = {}
+    if os.path.exists(CHANNELS_FILE):
+        try:
+            with open(CHANNELS_FILE, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+
+    today = datetime.now(KST).strftime("%Y-%m-%d")
+    if channel_id in data:
+        data[channel_id]["hits"] = data[channel_id].get("hits", 0) + 1
+        data[channel_id]["last_hit"] = today
+    else:
+        data[channel_id] = {
+            "name": channel_name,
+            "added": today,
+            "last_hit": today,
+            "hits": 1,
+        }
+        print(f"[채널 학습] 신규 등록: {channel_name} ({channel_id})")
+
+    try:
+        with open(CHANNELS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[채널목록 저장 오류] {e}")
 
 
 def fetch_channel_uploads(channel_id, channel_name, cutoff_iso):
@@ -163,6 +239,7 @@ def fetch_channel_uploads(channel_id, channel_name, cutoff_iso):
                 "snippet": {
                     "title": it["snippet"]["title"],
                     "channelTitle": channel_name,
+                    "channelId": channel_id,
                     "publishedAt": pub,
                     "description": it["snippet"].get("description", ""),
                 },
@@ -179,7 +256,12 @@ def fetch_channel_uploads(channel_id, channel_name, cutoff_iso):
 
 
 def collect_videos():
-    """키워드 검색 + 채널 순회를 합치고 videoId 기준으로 중복 제거."""
+    """키워드 검색 + 채널 순회를 합치고 videoId 기준으로 중복 제거.
+
+    두 경로는 서로를 보완한다.
+    - 검색: 모르는 채널까지 닿지만, 관련성 점수로 임의로 잘려 신뢰도가 낮다.
+    - 채널 순회: 등록된 채널만 보지만 그 채널 업로드는 100% 가져온다.
+    """
     cutoff = (datetime.now(timezone.utc)
               - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -190,15 +272,21 @@ def collect_videos():
         if vid not in seen_vids:
             seen_vids.add(vid)
             merged.append(item)
+    search_count = len(merged)
 
-    for cid, cname in CHANNELS.items():
+    channels = load_channels()
+    print(f"[채널 목록] 총 {len(channels)}개 "
+          f"(시드 {len(CHANNELS)} + 학습 {len(channels) - len(CHANNELS)})")
+
+    for cid, cname in channels.items():
         for item in fetch_channel_uploads(cid, cname, cutoff):
             vid = item["id"]["videoId"]
             if vid not in seen_vids:
                 seen_vids.add(vid)
                 merged.append(item)
 
-    print(f"[수집 완료] 총 {len(merged)}건")
+    print(f"[수집 완료] 총 {len(merged)}건 "
+          f"(검색 {search_count} + 채널 {len(merged) - search_count})")
     return merged
 
 
@@ -232,9 +320,14 @@ def verify_appearance_with_gemini(title, description):
         "실제로 출연(발언자/게스트/진행자)하는지 판단하세요.\n\n"
         "판단 규칙:\n"
         "- 제목이나 설명란의 출연자 소개에 이선엽이 있으면 YES.\n"
-        "- 설명란의 '추천 영상', '지난 방송', '관련 영상' 링크 목록이나 해시태그, "
+        "- '이선혁' 처럼 한 글자만 다른 비슷한 이름이 출연자 소개 위치에 적혀 있고, "
+        "해시태그나 다른 곳에는 '이선엽'이 있다면 오타로 보고 YES.\n"
+        "- 설명란의 '추천 영상', '지난 방송', '관련 영상' 링크 목록이나 "
         "채널 상용구에만 이선엽이 등장하고 이 영상 자체에는 다른 사람이 출연하면 NO.\n"
-        "- 제목에 다른 출연자 이름이 명시돼 있고 이선엽은 링크에만 보이면 NO.\n\n"
+        "- 다만 해시태그에 #이선엽이 있으면서 본문에도 출연자로 보이는 언급이 있으면 "
+        "YES로 판단하세요. 해시태그만 있다고 무조건 NO는 아닙니다.\n"
+        "- 제목에 다른 출연자 이름이 명시돼 있고 이선엽은 링크 목록에만 보이면 NO.\n"
+        "- 여러 명이 함께 출연하는 방송이라도 이선엽이 그중 한 명이면 YES.\n\n"
         f"[제목] {title}\n\n[설명란]\n{description[:3000]}\n\n"
         "반드시 YES 또는 NO 한 단어로만 답하세요."
     )
@@ -253,11 +346,14 @@ def verify_appearance_with_gemini(title, description):
 
 def matches_keyword(title, snippet_desc, vid_id, desc_is_full=False):
     """제목 → 설명란 순으로 키워드를 검사한다.
-    제목 매칭은 확실하므로 즉시 통과.
-    설명란에서만 발견되면 추천 링크 등에 이름만 있는 경우일 수 있어
-    Gemini로 실제 출연 여부를 한 번 더 검증한다."""
-    if KEYWORD in title:
-        return True
+    반환: (통과 여부, 사유코드)
+      title      - 제목에서 발견 (확실)
+      gemini-ok  - 설명란에서 발견 + Gemini가 출연 인정
+      gemini-no  - 설명란에서 발견했으나 Gemini가 미출연 판정
+      no-keyword - 제목·설명란 어디에도 없음
+    """
+    if _has_keyword(title):
+        return True, "title"
 
     if desc_is_full:
         # 채널 순회 결과 → 이미 전체 설명란을 갖고 있어 추가 조회 불필요
@@ -267,11 +363,28 @@ def matches_keyword(title, snippet_desc, vid_id, desc_is_full=False):
         # 링크 목록인지 출연자 소개인지 문맥 판단이 어려움 → 전체를 가져온다)
         description = get_full_description(vid_id) or snippet_desc
 
-    if KEYWORD not in description:
-        return False
+    if not _has_keyword(description):
+        return False, "no-keyword"
 
     # 설명란에만 이름이 있는 애매한 경우 → 출연 여부 검증
-    return verify_appearance_with_gemini(title, description)
+    if verify_appearance_with_gemini(title, description):
+        return True, "gemini-ok"
+    return False, "gemini-no"
+
+
+def log_rejection(reason, title, vid_id, channel=""):
+    """필터에서 걸러진 영상을 기록한다.
+    단순 키워드 미포함은 양이 너무 많아 남기지 않고,
+    Gemini가 미출연으로 판정한 '애매한 건'만 사후 검증용으로 쌓는다."""
+    line = (
+        f"{datetime.now(KST).strftime('%Y-%m-%d %H:%M')}\t{reason}\t"
+        f"{channel}\t{title}\thttps://www.youtube.com/watch?v={vid_id}\n"
+    )
+    try:
+        with open(REJECTED_LOG, "a", encoding="utf-8") as f:
+            f.write(line)
+    except Exception as e:
+        print(f"[거부 로그 저장 오류] {e}")
 
 
 def get_duration(vid_id):
@@ -637,6 +750,100 @@ PERSPECTIVE_FILE = "관점_종합.md"
 MIN_DURATION_SEC = 600  # 10분 = 600초
 
 
+# ────────────────────────────────────────────────
+# 놓침 점검 (주기적 감사)
+# ────────────────────────────────────────────────
+
+def should_run_audit():
+    """마지막 점검으로부터 AUDIT_INTERVAL_DAYS 이상 지났는지."""
+    if not os.path.exists(AUDIT_FILE):
+        return True
+    try:
+        with open(AUDIT_FILE, encoding="utf-8") as f:
+            last = datetime.strptime(f.read().strip(), "%Y-%m-%d").date()
+    except Exception:
+        return True
+    return (datetime.now(KST).date() - last).days >= AUDIT_INTERVAL_DAYS
+
+
+def mark_audit_done():
+    try:
+        with open(AUDIT_FILE, "w", encoding="utf-8") as f:
+            f.write(datetime.now(KST).strftime("%Y-%m-%d"))
+    except Exception as e:
+        print(f"[점검일 기록 오류] {e}")
+
+
+def audit_missed():
+    """평소와 '다른 각도'로 검색해 놓친 영상이 있는지 점검한다.
+
+    본 수집은 order=date + 14일이라 관련성 상위권만 훑는다.
+    여기서는 order=relevance + 30일로 돌려 다른 결과 집합을 얻고,
+    그중 seen_ids에 없는 것을 후보로 보고한다.
+    자동 처리하지 않고 사람이 판단하도록 목록만 알린다."""
+    seen = get_seen_ids()
+    url = "https://www.googleapis.com/youtube/v3/search"
+    published_after = (
+        datetime.now(timezone.utc) - timedelta(days=AUDIT_LOOKBACK_DAYS)
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    candidates, page_token = [], None
+    for page in range(2):
+        params = {
+            "part": "snippet",
+            "q": KEYWORD,
+            "type": "video",
+            "order": "relevance",     # 본 수집(date)과 다른 정렬 → 다른 결과 집합
+            "maxResults": 50,
+            "publishedAfter": published_after,
+            "key": YOUTUBE_API_KEY,
+        }
+        if page_token:
+            params["pageToken"] = page_token
+        try:
+            data = requests.get(url, params=params, timeout=30).json()
+        except Exception as e:
+            print(f"[점검 오류] {e}")
+            break
+        if "error" in data:
+            print(f"[점검 API 오류] {data['error'].get('message', '')[:80]}")
+            break
+
+        for it in data.get("items", []):
+            vid = it["id"].get("videoId")
+            if not vid or vid in seen:
+                continue
+            title = html.unescape(it["snippet"]["title"])
+            candidates.append((vid, title, it["snippet"]["channelTitle"]))
+
+        page_token = data.get("nextPageToken")
+        if not page_token:
+            break
+
+    mark_audit_done()
+
+    if not candidates:
+        print("[놓침 점검] 후보 없음")
+        send_telegram(
+            f"🔍 *놓침 점검 완료* (최근 {AUDIT_LOOKBACK_DAYS}일)\n"
+            "미처리 후보가 발견되지 않았습니다."
+        )
+        return
+
+    print(f"[놓침 점검] 후보 {len(candidates)}건")
+    lines = [
+        f"🔍 *놓침 점검* (최근 {AUDIT_LOOKBACK_DAYS}일)",
+        f"seen_ids에 없는 검색 결과 {len(candidates)}건입니다.",
+        "실제 출연작이 섞여 있으면 필터 개선이 필요합니다.\n",
+    ]
+    for vid, title, ch in candidates[:15]:
+        lines.append(f"• {title[:60]}\n  {ch}\n  https://www.youtube.com/watch?v={vid}")
+    if len(candidates) > 15:
+        lines.append(f"\n…외 {len(candidates) - 15}건")
+
+    send_telegram(clip("\n".join(lines)))
+
+
 def normalize_dates(text):
     """LLM이 프롬프트 규칙을 어겨도 날짜 표기를 강제로 통일한다.
     (26-07-31) → `07.31` / (26-07) → `07월` / (26-01~08) → `01~08월`
@@ -788,6 +995,7 @@ def main():
         # YouTube API는 제목의 특수문자를 &#39; 같은 HTML 엔티티로 반환할 수 있어 디코딩
         title        = html.unescape(item["snippet"]["title"])
         channel      = item["snippet"]["channelTitle"]
+        channel_id   = item["snippet"].get("channelId", "")
         published_at = item["snippet"]["publishedAt"]
         snippet_desc = item["snippet"].get("description", "")
         # 채널 순회로 온 항목은 설명란이 이미 전체라 재조회가 필요 없다
@@ -799,14 +1007,25 @@ def main():
             print(f"[SKIP] {title}")
             continue
 
-        if not matches_keyword(title, snippet_desc, vid_id, desc_is_full):
-            print(f"[SKIP-필터] {title}")
+        passed, reason = matches_keyword(title, snippet_desc, vid_id, desc_is_full)
+        if not passed:
+            print(f"[SKIP-필터:{reason}] {title}")
+            # Gemini가 판단한 애매한 건만 기록 (단순 미포함은 양이 많아 제외)
+            if reason == "gemini-no":
+                log_rejection(reason, title, vid_id, channel)
             continue
 
         # 10분 미만 영상(숏폼 등)은 요약하지 않고 건너뜀
         dur_sec = get_duration_seconds(vid_id)
         if 0 <= dur_sec < MIN_DURATION_SEC:
             print(f"[SKIP-길이] {title} ({dur_sec}초 < 10분)")
+            log_rejection("short", title, vid_id, channel)
+            if NOTIFY_SKIPS:
+                send_telegram(
+                    f"⏭ *짧은 영상 건너뜀* ({dur_sec // 60}분 {dur_sec % 60}초)\n"
+                    f"{title}\n{channel}\n"
+                    f"https://www.youtube.com/watch?v={vid_id}"
+                )
             save_seen_id(vid_id)  # 다음 실행 때 또 안 걸리게 기록
             continue
 
@@ -817,6 +1036,13 @@ def main():
         # 자막 없으면 요약/아카이브 안 함 (자막 있는 것만)
         if not transcript:
             print(f"[SKIP-자막없음] {title} ({fail_reason})")
+            log_rejection("no-transcript", title, vid_id, channel)
+            if NOTIFY_SKIPS:
+                send_telegram(
+                    f"⏭ *자막 없어 요약 생략*\n{title}\n{channel}\n"
+                    f"📅 {date_str}  ⏱ {duration_str}\n"
+                    f"https://www.youtube.com/watch?v={vid_id}"
+                )
             save_seen_id(vid_id)
             continue
 
@@ -838,6 +1064,9 @@ def main():
             f"https://www.youtube.com/watch?v={vid_id}"
         )
         send_telegram(video_msg)
+
+        # 출연이 확인된 채널은 자동 학습 → 다음부터 검색에 의존하지 않는다
+        learn_channel(channel_id, channel)
 
         new_items.append((title, date_str, tags, summary))
         save_seen_id(vid_id)
@@ -862,6 +1091,12 @@ def main():
         print("완료: 신규 영상 없음 알림 발송")
     else:
         print(f"완료: 신규 {new_count}건 알림 발송 + 아카이브 저장")
+
+    # 주기적으로 '놓친 영상이 있는지' 스스로 점검한다.
+    # 알림봇의 가장 큰 위험은 놓치는 것이 아니라 놓친 줄 모르는 것이다.
+    if should_run_audit():
+        print("[놓침 점검] 실행")
+        audit_missed()
 
 
 if __name__ == "__main__":
