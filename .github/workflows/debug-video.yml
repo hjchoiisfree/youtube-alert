@@ -5,11 +5,12 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Fetch
         env:
           KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: |
-          echo "key length: ${#KEY}"
-          echo "now UTC: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          echo "24h ago UTC: $(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
-          curl -s "https://www.googleapis.com/youtube/v3/videos?part=snippet,liveStreamingDetails&id=FdCmgrZh310&key=${KEY}"
+          curl -s "https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=QGqyaokGZbM&key=${KEY}" \
+            | jq '.items[0] | {title: .snippet.title, channel: .snippet.channelTitle, channelId: .snippet.channelId, publishedAt: .snippet.publishedAt, duration: .contentDetails.duration, tags: .snippet.tags, desc: .snippet.description}'
+          echo "--- seen_ids ---"
+          grep -q "QGqyaokGZbM" seen_ids.txt && echo "있음" || echo "없음"
