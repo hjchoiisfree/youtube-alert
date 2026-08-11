@@ -32,15 +32,22 @@ jobs:
           SUPADATA_API_KEY: ${{ secrets.SUPADATA_API_KEY }}
         run: python checker.py
       - name: 저장
+        if: always()
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           touch seen_ids.txt
-          git add seen_ids.txt archive/
+          mkdir -p archive
+          git add seen_ids.txt archive/ 2>/dev/null || true
           git add 관점_종합.md 2>/dev/null || true
           git add channels.json 2>/dev/null || true
           git add rejected.log 2>/dev/null || true
           git add last_audit.txt 2>/dev/null || true
-          git diff --cached --quiet || git commit -m "update seen_ids, archive, channels, 관점_종합"
-          git pull --rebase origin main
-          git push
+          git add verdicts.json 2>/dev/null || true
+          git diff --cached --quiet && echo "변경 없음" && exit 0
+          git commit -m "update seen_ids, archive, channels, verdicts, 관점_종합"
+          for i in 1 2 3; do
+            git pull --rebase --autostash origin main && git push origin HEAD:main && exit 0
+            echo "푸시 재시도 $i/3"; sleep 5
+          done
+          exit 1
