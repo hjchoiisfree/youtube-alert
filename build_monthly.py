@@ -3,7 +3,7 @@
 - archive/ 폴더의 md 노트들을 업로드 월별로 묶음
 - 각 달마다 그 달 영상 요약들을 종합 → 월별 섹션 생성
 - 전체를 관점_종합.md로 저장하고 텔레그램으로 발송
-- checker.py의 함수 재사용
+
 
 아카이브 파일명 형식: YYYY-MM-DD_제목.md (백필/일상봇이 저장한 형식)
 실행: GEMINI_API_KEY, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID 등 필요
@@ -13,6 +13,7 @@ import re
 import glob
 import time
 import requests
+
 
 ARCHIVE_DIR = "archive"
 PERSPECTIVE_FILE = "관점_종합.md"
@@ -79,6 +80,14 @@ def summarize_month(month, md_bodies):
         "## 🎯 주목 섹터·종목\n"
         "- 이 달 반복해서 주목한 섹터·테마. 개별 종목 추천은 하지 않으니, "
         "언급된 종목이 있으면 '추천'이 아니라 '언급 맥락'으로만.\n\n"
+        "■ 목록 형식 규칙\n"
+        "- 하위 항목을 만들 때는 반드시 공백 2칸으로 들여쓰세요.\n"
+        "  올바른 예:\n"
+        "  - 주요 논리:\n"
+        "    - 실적 기반의 정당성: 설명\n"
+        "    - 심리적 자산 방어: 설명\n"
+        "- 들여쓰기 없이 나열하면 상위·하위가 구분되지 않습니다.\n"
+        "- 중첩은 2단계까지만 씁니다.\n\n"
         "간결한 마크다운. 이 달 특징이 드러나게.\n\n"
         f"[{month} 영상 노트들]\n{joined[:120000]}"
     )
@@ -167,11 +176,22 @@ def to_telegram(md):
             out.append("━━━━━━━━━━━━━━━")
             continue
 
-        # 목록 기호 정리: "* 내용" / "- 내용" → "• 내용"
+        # 목록 기호 정리. 깊이마다 다른 기호를 써야 중첩이 눈에 보인다.
+        # 모두 '•' 로만 바꾸면 하위 항목이 상위와 구분되지 않아 평평해진다.
         indent = len(line) - len(line.lstrip())
         m = re.match(r"^([*\-+])\s+(.*)$", s)
         if m:
-            line = " " * indent + "• " + m.group(2)
+            # 마크다운 중첩은 보통 2칸 또는 4칸이라 구간으로 나눈다
+            if indent >= 8:
+                depth = 3
+            elif indent >= 4:
+                depth = 2
+            elif indent >= 1:
+                depth = 1
+            else:
+                depth = 0
+            bullet = ("•", "◦", "▫", "·")[depth]
+            line = "  " * depth + bullet + " " + m.group(2)
 
         # **볼드** → *볼드*
         line = re.sub(r"\*\*(.+?)\*\*", r"*\1*", line)
