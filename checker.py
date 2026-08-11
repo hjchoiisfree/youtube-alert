@@ -36,6 +36,10 @@ CHANNELS_FILE = "channels.json"
 REJECTED_LOG = "rejected.log"
 # 마지막 놓침 점검 실행일
 AUDIT_FILE = "last_audit.txt"
+# 출연검증 결과 캐시 (git 커밋되어 실행 간 유지)
+# 같은 영상을 매 실행마다 Gemini에 다시 묻는 낭비를 막는다.
+# 이것이 없으면 800건 규모에서 rate limit이 반드시 터진다.
+VERDICT_FILE = "verdicts.json"
 
 # 놓침 점검 주기(일)와 조회 범위(일)
 AUDIT_INTERVAL_DAYS = 7
@@ -307,14 +311,93 @@ def get_full_description(vid_id):
         return ""
 
 
+GEMINI_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    f"gemini-3.1-flash-lite:generateContent?key={GEMINI_API_KEY}"
+)
+
+
+def call_gemini(prompt, tag="Gemini", timeout=90, retries=3):
+    """Gemini 호출 공통 함수. 429는 지수 백오프로 재시도한다.
+
+    반환: (텍스트, None) 성공 / (None, 사유) 실패
+    사유가 있다는 것은 '모델이 답을 못 줬다'는 뜻이지
+    '아니다'라는 판정이 아니다. 호출자가 이 둘을 구분해야 한다.
+    """
+    body = {"contents": [{"parts": [{"text": prompt}]}]}
+    data = None
+
+    for attempt in range(retries):
+        try:
+            res = requests.post(GEMINI_URL, json=body, timeout=timeout)
+            data = res.json()
+        except Exception as e:
+            print(f"[{tag} 요청 오류] {type(e).__name__}")
+            return None, f"요청 오류: {type(e).__name__}"
+
+        err = data.get("error", {})
+        code = err.get("code")
+        msg = err.get("message", "")
+
+        # 일일 쿼터 소진은 기다려도 소용없으므로 즉시 포기
+        if code == 429 and "per day" not in msg.lower():
+            wait = 20 * (attempt + 1)
+            print(f"[{tag} 429] rate limit, {wait}초 대기 후 재시도 "
+                  f"({attempt + 1}/{retries})")
+            time.sleep(wait)
+            continue
+        break
+
+    if data and "error" in data:
+        msg = data["error"].get("message", "알 수 없는 오류")
+        print(f"[{tag} API 오류] {msg[:80]}")
+        return None, msg[:80]
+
+    try:
+        return data["candidates"][0]["content"]["parts"][0]["text"], None
+    except Exception as e:
+        # candidates 없음 = 429 잔여 응답이거나 safety block.
+        # 여기서 통과 처리하면 필터가 통째로 무력화된다.
+        print(f"[{tag} 파싱 실패] {type(e).__name__}: {e}")
+        return None, f"파싱 실패: {e}"
+
+
+def load_verdicts():
+    """확정된 출연검증 결과를 불러온다. {video_id: true/false}"""
+    if not os.path.exists(VERDICT_FILE):
+        return {}
+    try:
+        with open(VERDICT_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"[검증캐시 로드 오류] {e}")
+        return {}
+
+
+def save_verdict(vid_id, verdict):
+    """확정 판정만 저장한다. 보류(None)는 저장하지 않는다.
+    보류를 저장하면 다음 실행 때 재시도할 기회를 잃는다."""
+    if verdict is None or not vid_id:
+        return
+    data = load_verdicts()
+    data[vid_id] = bool(verdict)
+    try:
+        with open(VERDICT_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=1)
+    except Exception as e:
+        print(f"[검증캐시 저장 오류] {e}")
+
+
 def verify_appearance_with_gemini(title, description):
     """설명란에서만 '이선엽'이 발견된 애매한 경우, 실제 출연 영상인지 판별.
     설명란의 추천 영상 링크·해시태그에만 이름이 있는 가짜 매칭을 걸러낸다.
-    반환: True(출연) / False(미출연). API 오류 시 True(놓치는 것보다 안전)."""
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-3.1-flash-lite:generateContent?key={GEMINI_API_KEY}"
-    )
+
+    반환: True(출연) / False(미출연) / None(판정 불가 → 보류)
+
+    None을 True로 바꾸지 말 것. 예전에는 오류 시 True를 반환했는데,
+    rate limit이 걸리면 모든 영상이 통과해 필터가 무력화됐다.
+    보류로 두면 이번 실행에서 발송하지 않고 다음 실행에서 다시 시도한다.
+    """
     prompt = (
         "당신은 YouTube 영상 필터입니다. 아래 영상에 증권 애널리스트 '이선엽' 대표가 "
         "실제로 출연(발언자/게스트/진행자)하는지 판단하세요.\n\n"
@@ -331,29 +414,44 @@ def verify_appearance_with_gemini(title, description):
         f"[제목] {title}\n\n[설명란]\n{description[:3000]}\n\n"
         "반드시 YES 또는 NO 한 단어로만 답하세요."
     )
-    body = {"contents": [{"parts": [{"text": prompt}]}]}
-    try:
-        res = requests.post(url, json=body, timeout=60)
-        data = res.json()
-        answer = data["candidates"][0]["content"]["parts"][0]["text"].strip().upper()
-        verdict = answer.startswith("YES")
-        print(f"[출연검증] {title[:40]} → {answer[:10]}")
-        return verdict
-    except Exception as e:
-        print(f"[출연검증 오류] {e} → 일단 통과 처리")
+    text, err = call_gemini(prompt, tag="출연검증", timeout=60)
+
+    if err or not text:
+        print(f"[출연검증 보류] {title[:40]} ({err})")
+        return None
+
+    answer = text.strip().upper()
+    if answer.startswith("YES"):
+        print(f"[출연검증] {title[:40]} → YES")
         return True
+    if answer.startswith("NO"):
+        print(f"[출연검증] {title[:40]} → NO")
+        return False
+
+    # YES/NO 어느 쪽도 아닌 응답은 판정으로 인정하지 않는다
+    print(f"[출연검증 보류] {title[:40]} (형식 이탈: {answer[:20]})")
+    return None
 
 
 def matches_keyword(title, snippet_desc, vid_id, desc_is_full=False):
     """제목 → 설명란 순으로 키워드를 검사한다.
     반환: (통과 여부, 사유코드)
-      title      - 제목에서 발견 (확실)
-      gemini-ok  - 설명란에서 발견 + Gemini가 출연 인정
-      gemini-no  - 설명란에서 발견했으나 Gemini가 미출연 판정
-      no-keyword - 제목·설명란 어디에도 없음
+      title          - 제목에서 발견 (확실)
+      gemini-ok      - 설명란에서 발견 + Gemini가 출연 인정
+      gemini-no      - 설명란에서 발견했으나 Gemini가 미출연 판정
+      gemini-cached  - 캐시된 미출연 판정 (API 호출 없음)
+      gemini-pending - 판정 불가. 이번엔 보류하고 다음 실행에서 재시도
+      no-keyword     - 제목·설명란 어디에도 없음
     """
     if _has_keyword(title):
         return True, "title"
+
+    # 이미 판정이 끝난 영상은 다시 묻지 않는다 (429 예방의 핵심)
+    cached = load_verdicts().get(vid_id)
+    if cached is True:
+        return True, "gemini-cached-ok"
+    if cached is False:
+        return False, "gemini-cached"
 
     if desc_is_full:
         # 채널 순회 결과 → 이미 전체 설명란을 갖고 있어 추가 조회 불필요
@@ -367,9 +465,14 @@ def matches_keyword(title, snippet_desc, vid_id, desc_is_full=False):
         return False, "no-keyword"
 
     # 설명란에만 이름이 있는 애매한 경우 → 출연 여부 검증
-    if verify_appearance_with_gemini(title, description):
-        return True, "gemini-ok"
-    return False, "gemini-no"
+    verdict = verify_appearance_with_gemini(title, description)
+
+    if verdict is None:
+        # 판정 불가: 통과도 탈락도 아님. seen에 기록하지 않고 다음 실행에서 재시도.
+        return False, "gemini-pending"
+
+    save_verdict(vid_id, verdict)
+    return (True, "gemini-ok") if verdict else (False, "gemini-no")
 
 
 def log_rejection(reason, title, vid_id, channel=""):
@@ -525,11 +628,6 @@ def get_transcript(vid_id):
 
 def summarize_with_gemini(title, transcript):
     """transcript가 있으면 자막 기반, 없으면 제목 기반(환각 위험)으로 요약."""
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-3.1-flash-lite:generateContent?key={GEMINI_API_KEY}"
-    )
-
     if transcript:
         source_block = (
             "아래는 영상의 실제 자막 전문입니다. 반드시 이 자막 내용에만 근거해 작성하세요. "
@@ -573,35 +671,10 @@ def summarize_with_gemini(title, transcript):
         "- 그가 경계한 위험 요소 1~2개"
     )
 
-    body = {"contents": [{"parts": [{"text": prompt}]}]}
-
-    data = None
-    for attempt in range(3):
-        try:
-            res = requests.post(url, json=body, timeout=90)
-            data = res.json()
-        except Exception as e:
-            print(f"[Gemini 요청 오류] {e}")
-            return "요약 실패 (Gemini 요청 오류)"
-
-        err = data.get("error", {})
-        if err.get("code") == 429 and "per day" not in err.get("message", "").lower():
-            wait = 20 * (attempt + 1)
-            print(f"[Gemini 429] rate limit, {wait}초 대기 후 재시도 ({attempt+1}/3)")
-            time.sleep(wait)
-            continue
-        break
-
-    if data and "error" in data:
-        msg = data["error"].get("message", "알 수 없는 오류")
-        print(f"[Gemini API 오류] {msg}")
-        return f"요약 실패 ({msg[:80]})"
-
-    try:
-        return data["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception as e:
-        print(f"[Gemini 파싱 오류] {e} / 응답: {data}")
-        return "요약 실패 (응답 파싱 불가)"
+    text, err = call_gemini(prompt, tag="요약", timeout=90)
+    if err or not text:
+        return f"요약 실패 ({err})"
+    return text
 
 
 # ────────────────────────────────────────────────
@@ -909,10 +982,6 @@ def update_perspective(new_items):
             f"\n\n=== 신규 영상: {title} ({date_str}) [{', '.join(tags)}] ===\n{summary}"
         )
 
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-3.1-flash-lite:generateContent?key={GEMINI_API_KEY}"
-    )
     this_year = datetime.now(KST).year
 
     prompt = (
@@ -966,13 +1035,9 @@ def update_perspective(new_items):
         f"[기존 종합]\n{prev if prev else '(아직 없음 - 처음부터 작성)'}\n"
         f"\n[이번 신규 영상들]{new_block}"
     )
-    body = {"contents": [{"parts": [{"text": prompt}]}]}
-    try:
-        res = requests.post(url, json=body, timeout=120)
-        data = res.json()
-        updated = data["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception as e:
-        print(f"[관점_종합 갱신 오류] {e}")
+    updated, err = call_gemini(prompt, tag="관점_종합", timeout=120)
+    if err or not updated:
+        print(f"[관점_종합 갱신 실패] {err} → 기존 파일 유지")
         return None
 
     # 모델이 규칙을 어겼을 경우를 대비한 강제 정규화
@@ -988,6 +1053,7 @@ def main():
     seen = get_seen_ids()
     videos = collect_videos()
     new_count = 0
+    pending_count = 0   # 판정 불가로 보류된 건 (다음 실행에서 재시도)
     new_items = []  # 이번에 처리한 (title, date_str, tags, summary)
 
     for item in videos:
@@ -1009,6 +1075,13 @@ def main():
 
         passed, reason = matches_keyword(title, snippet_desc, vid_id, desc_is_full)
         if not passed:
+            if reason == "gemini-pending":
+                # 판정 불가 → 보류. seen에도 캐시에도 남기지 않으므로
+                # 다음 실행에서 자동으로 다시 검증된다.
+                pending_count += 1
+                print(f"[보류] {title}")
+                continue
+
             print(f"[SKIP-필터:{reason}] {title}")
             # Gemini가 판단한 애매한 건만 기록 (단순 미포함은 양이 많아 제외)
             if reason == "gemini-no":
@@ -1085,12 +1158,24 @@ def main():
             send_telegram(persp_msg)
             print("[관점 종합 메시지 발송]")
 
+    # 보류가 있으면 조용히 넘어가지 않고 반드시 알린다.
+    # 보류를 숨기면 '놓친 줄 모르는' 상태가 되어 가장 위험하다.
+    pending_note = (
+        f"\n⏳ 판정 보류 {pending_count}건 (다음 실행에서 재검증)"
+        if pending_count else ""
+    )
+
     if new_count == 0:
         now = datetime.now(KST).strftime("%Y년 %m월 %d일 %H:%M")
-        send_telegram(f"✅ 이선엽 대표 새 영상 없음\n({now} 기준)")
-        print("완료: 신규 영상 없음 알림 발송")
+        send_telegram(f"✅ 이선엽 대표 새 영상 없음\n({now} 기준){pending_note}")
+        print(f"완료: 신규 영상 없음 (보류 {pending_count}건)")
     else:
-        print(f"완료: 신규 {new_count}건 알림 발송 + 아카이브 저장")
+        if pending_note:
+            send_telegram(f"⏳ *판정 보류 {pending_count}건*\n"
+                          f"Gemini 응답 실패로 이번 실행에서는 판단을 미뤘습니다. "
+                          f"다음 실행에서 자동으로 다시 검증합니다.")
+        print(f"완료: 신규 {new_count}건 알림 발송 + 아카이브 저장 "
+              f"(보류 {pending_count}건)")
 
     # 주기적으로 '놓친 영상이 있는지' 스스로 점검한다.
     # 알림봇의 가장 큰 위험은 놓치는 것이 아니라 놓친 줄 모르는 것이다.
