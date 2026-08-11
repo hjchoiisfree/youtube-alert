@@ -116,12 +116,63 @@ def summarize_month(month, md_bodies):
     return None
 
 
+TG_LIMIT = 3500  # 텔레그램 상한 4096보다 여유를 둔다
+
+
+def _tg_post(text, markdown=True):
+    """실제 발송. 성공 여부를 bool로 돌려준다."""
+    payload = {"chat_id": os.environ["TELEGRAM_CHAT_ID"], "text": text}
+    if markdown:
+        payload["parse_mode"] = "Markdown"
+    try:
+        res = requests.post(
+            f"https://api.telegram.org/bot{os.environ['TELEGRAM_TOKEN']}/sendMessage",
+            json=payload, timeout=30,
+        )
+        if res.status_code == 200:
+            return True
+        print(f"  [텔레그램 {res.status_code}] {res.text[:120]}")
+        return False
+    except Exception as e:
+        print(f"  [텔레그램 요청 오류] {type(e).__name__}")
+        return False
+
+
+def _split_text(text, limit=TG_LIMIT):
+    """줄 경계에서 나눈다. 문자 수로 무작정 자르면
+    굵은 글씨(*) 중간이 잘려 Markdown 파싱이 깨진다."""
+    chunks, cur = [], ""
+    for line in text.split("\n"):
+        # 한 줄 자체가 너무 길면 강제로 쪼갠다
+        while len(line) > limit:
+            if cur:
+                chunks.append(cur)
+                cur = ""
+            chunks.append(line[:limit])
+            line = line[limit:]
+        if len(cur) + len(line) + 1 > limit:
+            chunks.append(cur)
+            cur = line
+        else:
+            cur = f"{cur}\n{line}" if cur else line
+    if cur.strip():
+        chunks.append(cur)
+    return chunks
+
+
 def send_telegram(text):
-    requests.post(
-        f"https://api.telegram.org/bot{os.environ['TELEGRAM_TOKEN']}/sendMessage",
-        json={"chat_id": os.environ["TELEGRAM_CHAT_ID"],
-              "text": text, "parse_mode": "Markdown"},
-    )
+    """길면 나눠 보내고, Markdown이 거부되면 평문으로 재시도한다.
+    응답을 확인하지 않으면 실패해도 '발송 완료'로 찍혀 알 수가 없다."""
+    ok_all = True
+    for chunk in _split_text(text):
+        if _tg_post(chunk, markdown=True):
+            continue
+        # Markdown 파싱 실패 → 서식 없이 재시도
+        print("  → 평문으로 재시도")
+        if not _tg_post(chunk, markdown=False):
+            ok_all = False
+        time.sleep(1)
+    return ok_all
 
 
 def main():
@@ -185,17 +236,25 @@ def main():
         head += f"⚠️ 실패: {', '.join(failed)} (재실행 필요)\n"
     head += "아래에 월별로 이어서 보냅니다."
     send_telegram(head)
+    sent, failed_send = 0, []
     for month in months:
-        # result에서 해당 월 섹션만 잘라 보내기
         marker = f"# 📅 {month}"
         idx = result.find(marker)
         if idx == -1:
             continue
         next_idx = result.find("# 📅", idx + 1)
         section = result[idx: next_idx if next_idx != -1 else len(result)]
-        send_telegram(section[:3800])
+        # 예전에는 section[:3800] 으로 잘라 보냈는데,
+        # 서식 중간이 잘리면 Markdown 파싱이 깨져 통째로 발송 실패했다.
+        if send_telegram(section):
+            sent += 1
+        else:
+            failed_send.append(month)
         time.sleep(1)
-    print("[텔레그램 발송 완료]")
+
+    print(f"[텔레그램] {sent}/{len(months)}개월 발송 완료")
+    if failed_send:
+        print(f"[텔레그램 실패] {', '.join(failed_send)}")
 
 
 if __name__ == "__main__":
