@@ -14,6 +14,8 @@ import glob
 import time
 import requests
 
+import checker
+
 ARCHIVE_DIR = "archive"
 PERSPECTIVE_FILE = "관점_종합.md"
 # 월별 결과를 개별 파일로 남긴다. 한 달이 실패해도 성공한 달은
@@ -140,6 +142,48 @@ def summarize_month(month, md_bodies):
 TG_LIMIT = 3500  # 텔레그램 상한 4096보다 여유를 둔다
 
 
+def to_telegram(md):
+    """마크다운을 텔레그램 레거시 Markdown이 이해하는 형태로 변환.
+
+    텔레그램은 ## 헤더도, **볼드**도 모른다. 볼드는 * 하나만 쓴다.
+    변환하지 않으면 파싱이 깨져 평문으로 폴백되고, 별표가 그대로 보인다.
+    줄 앞의 '* ' 는 목록 기호인데 텔레그램은 볼드 시작으로 읽어버리므로
+    가운뎃점으로 바꿔야 한다.
+    """
+    if not md:
+        return md
+
+    out = []
+    for line in md.split("\n"):
+        s = line.strip()
+
+        # ### 제목 → *제목*
+        if s.startswith("#"):
+            t = s.lstrip("#").strip()
+            t = t.replace("*", "")          # 헤더 안의 별표는 제거
+            out.append(f"*{t}*" if t else "")
+            continue
+
+        # --- 구분선
+        if set(s) <= {"-", "─", "=", "*", "_"} and len(s) >= 3:
+            out.append("━━━━━━━━━━━━━━━")
+            continue
+
+        # 목록 기호 정리: "* 내용" / "- 내용" → "• 내용"
+        indent = len(line) - len(line.lstrip())
+        m = re.match(r"^([*\-+])\s+(.*)$", s)
+        if m:
+            line = " " * indent + "• " + m.group(2)
+
+        # **볼드** → *볼드*
+        line = re.sub(r"\*\*(.+?)\*\*", r"*\1*", line)
+        out.append(line)
+
+    text = "\n".join(out)
+    text = re.sub(r"\n{3,}", "\n\n", text)   # 빈 줄 3개 이상 압축
+    return text.strip()
+
+
 def _tg_post(text, markdown=True):
     """실제 발송. 성공 여부를 bool로 돌려준다."""
     payload = {"chat_id": os.environ["TELEGRAM_CHAT_ID"], "text": text}
@@ -181,14 +225,21 @@ def _split_text(text, limit=TG_LIMIT):
     return chunks
 
 
-def send_telegram(text):
+def send_telegram(text, convert=True):
     """길면 나눠 보내고, Markdown이 거부되면 평문으로 재시도한다.
-    응답을 확인하지 않으면 실패해도 '발송 완료'로 찍혀 알 수가 없다."""
+    응답을 확인하지 않으면 실패해도 '발송 완료'로 찍혀 알 수가 없다.
+
+    convert=True면 텔레그램용 서식으로 바꿔서 보낸다.
+    (파일에 저장하는 원본은 일반 마크다운 그대로 둬야 GitHub에서 잘 보인다)
+    """
+    if convert:
+        text = to_telegram(text)
+
     ok_all = True
     for chunk in _split_text(text):
-        if _tg_post(chunk, markdown=True):
+        # 별표 짝이 안 맞으면 텔레그램이 통째로 거부하므로 미리 평문으로 보낸다
+        if chunk.count("*") % 2 == 0 and _tg_post(chunk, markdown=True):
             continue
-        # Markdown 파싱 실패 → 서식 없이 재시도
         print("  → 평문으로 재시도")
         if not _tg_post(chunk, markdown=False):
             ok_all = False
