@@ -18,7 +18,13 @@ import checker
 
 ARCHIVE_DIR = "archive"
 PERSPECTIVE_FILE = "관점_종합.md"
+# 월별 결과를 개별 파일로 남긴다. 한 달이 실패해도 성공한 달은
+# 다시 만들지 않으므로, 재실행이 실패한 달만 겨냥하게 된다.
+MONTH_CACHE_DIR = "monthly"
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
+
+# 특정 달만 강제로 다시 만들고 싶을 때: REBUILD="2026-07" 또는 "all"
+REBUILD = os.environ.get("REBUILD", "").strip()
 
 
 # 원문 자막 섹션의 시작을 알리는 표식들.
@@ -79,7 +85,7 @@ def summarize_month(month, md_bodies):
         f"[{month} 영상 노트들]\n{joined[:120000]}"
     )
     body = {"contents": [{"parts": [{"text": prompt}]}]}
-    for attempt in range(4):
+    for attempt in range(6):
         try:
             res = requests.post(url, json=body, timeout=120)
             data = res.json()
@@ -103,6 +109,23 @@ def summarize_month(month, md_bodies):
             time.sleep(wait)
             continue
         if err:
+            low = msg.lower()
+            # 일시적 과부하(503 UNAVAILABLE, "high demand")는 재시도하면 풀린다.
+            # 영구 오류와 뭉뚱그려 즉시 포기하면 그 달이 통째로 날아간다.
+            transient = (
+                code in (500, 502, 503)
+                or "high demand" in low
+                or "overloaded" in low
+                or "unavailable" in low
+                or "try again" in low
+                or "internal" in low
+            )
+            if transient:
+                wait = 20 * (attempt + 1)
+                print(f"  [일시 오류] {msg[:60]} → {wait}초 후 재시도 "
+                      f"({attempt + 1}/6)")
+                time.sleep(wait)
+                continue
             print(f"  [API 오류] {msg[:80]}")
             return None
 
@@ -203,11 +226,30 @@ def main():
     months = sorted(by_month.keys())
     print(f"월 그룹: {months}")
 
+    os.makedirs(MONTH_CACHE_DIR, exist_ok=True)
+    rebuild_all = REBUILD.lower() == "all"
+    force = {m.strip() for m in REBUILD.split(",") if m.strip()} if not rebuild_all else set()
+
     full = ["# 이선엽 관점 종합 (월별)\n"]
     failed = []
 
     for month in months:
         paths = by_month[month]
+        cache_path = os.path.join(MONTH_CACHE_DIR, f"{month}.md")
+
+        # 이미 성공한 달은 다시 만들지 않는다.
+        # 실패한 달만 재실행하면 쿼터도 아끼고,
+        # 잘 나온 달이 재생성 중에 망가질 위험도 없다.
+        if (os.path.exists(cache_path) and not rebuild_all
+                and month not in force):
+            with open(cache_path, encoding="utf-8") as f:
+                cached = f.read().strip()
+            if cached:
+                print(f"[{month}] 캐시 사용 ({len(paths)}개 영상)")
+                full.append(f"\n\n---\n\n# 📅 {month} ({len(paths)}개 영상)"
+                            f"\n\n{cached}")
+                continue
+
         bodies = [extract_summary_from_md(p) for p in paths]
         total = sum(len(b) for b in bodies)
         print(f"[{month}] {len(paths)}개 영상, 본문 {total:,}자 종합 중...")
@@ -217,10 +259,13 @@ def main():
             print(f"  [{month}] 실패")
             failed.append(month)
             # 실패한 달을 조용히 빼면 종합본에 구멍이 뚫린 줄 모른다.
+            # 실패 결과는 캐시에 저장하지 않는다 (다음 실행에서 재시도되도록).
             full.append(f"\n\n---\n\n# 📅 {month} ({len(paths)}개 영상)\n\n"
                         f"> ⚠️ 이 달은 생성에 실패했습니다. 재실행이 필요합니다.")
             continue
 
+        with open(cache_path, "w", encoding="utf-8") as f:
+            f.write(month_summary)
         full.append(f"\n\n---\n\n# 📅 {month} ({len(paths)}개 영상)\n\n{month_summary}")
         time.sleep(5)
 
