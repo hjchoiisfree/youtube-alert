@@ -21,13 +21,39 @@ PERSPECTIVE_FILE = "관점_종합.md"
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
 
+# 원문 자막 섹션의 시작을 알리는 표식들.
+# 아카이브 형식이 <details> 태그에서 마크다운 헤딩으로 바뀌어서
+# 예전 <details> 하나만 보면 자막이 통째로 남는다.
+TRANSCRIPT_MARKERS = [
+    "<details>",
+    "원문 자막",
+    "📜 원문",
+    "## 📜",
+]
+
+
 def extract_summary_from_md(path):
-    """아카이브 md에서 제목/날짜/요약 본문만 추출 (원문 자막 제외)."""
+    """아카이브 md에서 요약 본문만 추출한다 (원문 자막 제외).
+
+    자막을 제대로 잘라내지 못하면 프롬프트가 수만 자로 불어나
+    joined[:120000] 에서 뒤쪽 영상들이 통째로 잘려나간다.
+    """
     with open(path, "r", encoding="utf-8") as f:
         content = f.read()
-    # 원문 자막(<details> 이후) 잘라내기
-    body = content.split("<details>")[0]
-    return body.strip()
+
+    cut = len(content)
+    for marker in TRANSCRIPT_MARKERS:
+        idx = content.find(marker)
+        if idx != -1:
+            cut = min(cut, idx)
+
+    body = content[:cut].strip()
+
+    # 코드블록이 열린 채로 잘렸으면 남은 백틱 제거
+    if body.count("```") % 2 == 1:
+        body = body.rsplit("```", 1)[0].strip()
+
+    return body
 
 
 def summarize_month(month, md_bodies):
@@ -36,7 +62,11 @@ def summarize_month(month, md_bodies):
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"gemini-3.1-flash-lite:generateContent?key={GEMINI_API_KEY}"
     )
-    joined = "\n\n---\n\n".join(md_bodies)
+    # 노트 하나가 지나치게 길면 뒤쪽 영상이 통째로 잘려나가므로
+    # 개별 노트에도 상한을 둬서 모든 영상이 최소한 반영되게 한다.
+    per_note = max(1500, 110000 // max(1, len(md_bodies)))
+    trimmed = [b[:per_note] for b in md_bodies]
+    joined = "\n\n---\n\n".join(trimmed)
     prompt = (
         f"아래는 {month} 한 달 동안 이선엽 대표가 출연한 여러 영상의 분석 노트입니다.\n"
         f"이 달 이선엽의 시장 관점을 아래 두 카테고리로 종합하세요.\n\n"
@@ -49,20 +79,40 @@ def summarize_month(month, md_bodies):
         f"[{month} 영상 노트들]\n{joined[:120000]}"
     )
     body = {"contents": [{"parts": [{"text": prompt}]}]}
-    for attempt in range(3):
+    for attempt in range(4):
         try:
             res = requests.post(url, json=body, timeout=120)
             data = res.json()
-            err = data.get("error", {})
-            if err.get("code") == 429:
-                wait = 30 * (attempt + 1)
-                print(f"  429, {wait}초 대기")
-                time.sleep(wait)
-                continue
-            return data["candidates"][0]["content"]["parts"][0]["text"]
         except Exception as e:
-            print(f"  [월 종합 오류] {e}")
+            print(f"  [요청 오류] {type(e).__name__}, 10초 후 재시도")
             time.sleep(10)
+            continue
+
+        err = data.get("error", {})
+        code = err.get("code")
+        msg = err.get("message", "")
+
+        # 일일 쿼터 소진은 기다려도 소용없다. 즉시 포기해야
+        # 남은 달들이 무의미하게 시간을 끌지 않는다.
+        if code == 429 and "per day" in msg.lower():
+            print(f"  [일일 쿼터 소진] {month} 중단")
+            return None
+        if code == 429:
+            wait = 30 * (attempt + 1)
+            print(f"  429, {wait}초 대기 ({attempt + 1}/4)")
+            time.sleep(wait)
+            continue
+        if err:
+            print(f"  [API 오류] {msg[:80]}")
+            return None
+
+        try:
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception:
+            # safety block 등으로 candidates가 없는 경우
+            print(f"  [파싱 실패] 응답에 candidates 없음, 재시도")
+            time.sleep(10)
+
     return None
 
 
@@ -75,8 +125,19 @@ def send_telegram(text):
 
 
 def main():
+    # archive/ 바로 아래의 md만 읽는다.
+    # archive/rejected, archive/review 는 하위 폴더라 glob에 잡히지 않지만,
+    # 의도를 분명히 하기 위해 명시적으로 걸러둔다.
     files = sorted(glob.glob(os.path.join(ARCHIVE_DIR, "*.md")))
+    files = [f for f in files
+             if os.path.basename(os.path.dirname(f)) == ARCHIVE_DIR]
     print(f"아카이브 파일: {len(files)}개")
+
+    for sub in ("rejected", "review"):
+        d = os.path.join(ARCHIVE_DIR, sub)
+        if os.path.isdir(d):
+            n = len([x for x in os.listdir(d) if x.endswith(".md")])
+            print(f"  (제외) {sub}/ {n}개")
 
     # 월별로 그룹핑 (파일명 앞 YYYY-MM)
     by_month = {}
@@ -92,14 +153,23 @@ def main():
     print(f"월 그룹: {months}")
 
     full = ["# 이선엽 관점 종합 (월별)\n"]
+    failed = []
+
     for month in months:
         paths = by_month[month]
-        print(f"[{month}] {len(paths)}개 영상 종합 중...")
         bodies = [extract_summary_from_md(p) for p in paths]
+        total = sum(len(b) for b in bodies)
+        print(f"[{month}] {len(paths)}개 영상, 본문 {total:,}자 종합 중...")
+
         month_summary = summarize_month(month, bodies)
         if not month_summary:
-            print(f"  [{month}] 실패, 건너뜀")
+            print(f"  [{month}] 실패")
+            failed.append(month)
+            # 실패한 달을 조용히 빼면 종합본에 구멍이 뚫린 줄 모른다.
+            full.append(f"\n\n---\n\n# 📅 {month} ({len(paths)}개 영상)\n\n"
+                        f"> ⚠️ 이 달은 생성에 실패했습니다. 재실행이 필요합니다.")
             continue
+
         full.append(f"\n\n---\n\n# 📅 {month} ({len(paths)}개 영상)\n\n{month_summary}")
         time.sleep(5)
 
@@ -109,7 +179,12 @@ def main():
     print(f"[저장 완료] {PERSPECTIVE_FILE}")
 
     # 텔레그램 발송 (월별로 나눠서 - 길이 제한 대응)
-    send_telegram("🧭 *이선엽 관점 종합 (월별)* 생성 완료\n아래에 월별로 이어서 보냅니다.")
+    head = (f"🧭 *이선엽 관점 종합 (월별)* 생성 완료\n"
+            f"영상 {len(files)}개 / {len(months)}개월\n")
+    if failed:
+        head += f"⚠️ 실패: {', '.join(failed)} (재실행 필요)\n"
+    head += "아래에 월별로 이어서 보냅니다."
+    send_telegram(head)
     for month in months:
         # result에서 해당 월 섹션만 잘라 보내기
         marker = f"# 📅 {month}"
