@@ -14,8 +14,6 @@ import glob
 import time
 import requests
 
-import checker
-
 ARCHIVE_DIR = "archive"
 PERSPECTIVE_FILE = "관점_종합.md"
 # 월별 결과를 개별 파일로 남긴다. 한 달이 실패해도 성공한 달은
