@@ -1,0 +1,48 @@
+name: 월별 관점 통합
+
+on:
+  workflow_dispatch:
+    inputs:
+      rebuild:
+        description: '다시 만들 달 (비우면 실패한 달만. 예 2026-07 / all)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install requests
+
+      - name: 월별 종합 생성
+        env:
+          GEMINI_API_KEY:   ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          REBUILD:          ${{ inputs.rebuild }}
+        run: python build_monthly.py
+
+      - name: 결과 커밋
+        if: always()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add 관점_종합.md 2>/dev/null || true
+          git add monthly 2>/dev/null || true
+          git diff --cached --quiet && echo "변경 없음" && exit 0
+          git commit -m "월별 관점 종합 갱신"
+          for i in 1 2 3; do
+            git pull --rebase --autostash origin main && git push origin HEAD:main && exit 0
+            echo "푸시 재시도 $i/3"; sleep 5
+          done
+          exit 1
