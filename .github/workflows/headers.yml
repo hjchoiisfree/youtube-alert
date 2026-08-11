@@ -1,1 +1,21 @@
-for f in archive/*.md; do echo "===== $f"; head -8 "$f"; echo ""; done > headers.txt
+name: 아카이브 헤더 추출
+on:
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 헤더 추출
+        run: |
+          for f in archive/*.md; do
+            echo "===== $f"
+            head -8 "$f"
+            echo ""
+          done > headers.txt
+          wc -l headers.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: headers
+          path: headers.txt
