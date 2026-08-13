@@ -44,6 +44,7 @@ jobs:
           git add rejected.log 2>/dev/null || true
           git add last_audit.txt 2>/dev/null || true
           git add verdicts.json 2>/dev/null || true
+          git add transcript_retry.json 2>/dev/null || true
           git diff --cached --quiet && echo "변경 없음" && exit 0
           git commit -m "update seen_ids, archive, channels, verdicts, 관점_종합"
           for i in 1 2 3; do
