@@ -1,6 +1,10 @@
 name: debug-video
 on:
   workflow_dispatch:
+    inputs:
+      video_id:
+        description: '영상 ID (watch?v= 뒤 11자)'
+        required: true
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -9,8 +13,18 @@ jobs:
       - name: Fetch
         env:
           KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          VID: ${{ inputs.video_id }}
         run: |
-          curl -s "https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=QGqyaokGZbM&key=${KEY}" \
-            | jq '.items[0] | {title: .snippet.title, channel: .snippet.channelTitle, channelId: .snippet.channelId, publishedAt: .snippet.publishedAt, duration: .contentDetails.duration, tags: .snippet.tags, desc: .snippet.description}'
+          curl -s "https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,liveStreamingDetails&id=${VID}&key=${KEY}" \
+            | jq '.items[0] | {
+                title: .snippet.title,
+                channel: .snippet.channelTitle,
+                channelId: .snippet.channelId,
+                publishedAt: .snippet.publishedAt,
+                duration: .contentDetails.duration,
+                live: .liveStreamingDetails,
+                tags: .snippet.tags,
+                desc: .snippet.description
+              }'
           echo "--- seen_ids ---"
-          grep -q "QGqyaokGZbM" seen_ids.txt && echo "있음" || echo "없음"
+          grep -q "${VID}" seen_ids.txt && echo "있음" || echo "없음"
