@@ -40,6 +40,10 @@ AUDIT_FILE = "last_audit.txt"
 # 같은 영상을 매 실행마다 Gemini에 다시 묻는 낭비를 막는다.
 # 이것이 없으면 800건 규모에서 rate limit이 반드시 터진다.
 VERDICT_FILE = "verdicts.json"
+# 자막 확보 실패 영상의 재시도 횟수 (git 커밋되어 실행 간 유지)
+# 자동 자막은 업로드 직후 안 붙는 경우가 많아, 한 번 실패했다고 버리면 안 된다.
+TRANSCRIPT_RETRY_FILE = "transcript_retry.json"
+TRANSCRIPT_MAX_RETRIES = 3   # 하루 1회 실행이므로 사실상 3일간 재시도
 
 # 놓침 점검 주기(일)와 조회 범위(일)
 AUDIT_INTERVAL_DAYS = 7
@@ -85,8 +89,11 @@ def save_seen_id(vid_id):
         f.write(vid_id + "\n")
 
 
-# 검색 범위: 최근 N일 이내 영상을 페이지 넘기며 전부 수집
+# 검색 경로: search.list 는 색인 지연이 있어 넓게 잡는다.
+# 좁히면 '어제 놓친 영상'이 창 밖으로 밀려 영구 누락된다. seen_ids 로 중복을 거른다.
 LOOKBACK_DAYS = 14
+# 채널 순회 경로: 지연이 없어 짧아도 안전. 다작 채널의 페이지 낭비를 막는다.
+CHANNEL_LOOKBACK_DAYS = 3
 # 쿼터 보호용 최대 페이지 수 (1페이지=50개, 검색 1회당 쿼터 100 소모)
 MAX_SEARCH_PAGES = 3
 
@@ -142,6 +149,7 @@ CHANNELS = {
     "UCLv3v82YNNsa8EsxrcPMjGQ": "SBS 시사교양 라디오 - 시교라",
     "UC6kZpTl39-_SqfBrF1-N2oQ": "연합뉴스경제TV",
     "UCD0k4Kq7SJROxxV-9N5v8IA": "깨비증권 마블TV [KB증권]",
+    "UCIUni4ScRp4mqPXsxy62L5w": "언더스탠딩 : 세상의 모든 지식",
 }
 
 # 채널당 조회할 최대 페이지 수 (1페이지=50개).
@@ -263,11 +271,13 @@ def collect_videos():
     """키워드 검색 + 채널 순회를 합치고 videoId 기준으로 중복 제거.
 
     두 경로는 서로를 보완한다.
-    - 검색: 모르는 채널까지 닿지만, 관련성 점수로 임의로 잘려 신뢰도가 낮다.
-    - 채널 순회: 등록된 채널만 보지만 그 채널 업로드는 100% 가져온다.
+    - 검색: 모르는 채널까지 닿지만, 색인 지연과 관련성 점수로 임의로 잘려 신뢰도가 낮다.
+    - 채널 순회: 등록된 채널만 보지만 그 채널 업로드는 100% 가져온다. 지연도 없다.
+    조회 범위를 다르게 두는 이유가 여기 있다.
     """
-    cutoff = (datetime.now(timezone.utc)
-              - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    channel_cutoff = (
+        datetime.now(timezone.utc) - timedelta(days=CHANNEL_LOOKBACK_DAYS)
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     merged, seen_vids = [], set()
 
@@ -283,7 +293,7 @@ def collect_videos():
           f"(시드 {len(CHANNELS)} + 학습 {len(channels) - len(CHANNELS)})")
 
     for cid, cname in channels.items():
-        for item in fetch_channel_uploads(cid, cname, cutoff):
+        for item in fetch_channel_uploads(cid, cname, channel_cutoff):
             vid = item["id"]["videoId"]
             if vid not in seen_vids:
                 seen_vids.add(vid)
@@ -473,6 +483,25 @@ def matches_keyword(title, snippet_desc, vid_id, desc_is_full=False):
 
     save_verdict(vid_id, verdict)
     return (True, "gemini-ok") if verdict else (False, "gemini-no")
+
+
+def bump_transcript_retry(vid_id):
+    """자막 실패 횟수를 1 올리고 현재 횟수를 반환한다."""
+    data = {}
+    if os.path.exists(TRANSCRIPT_RETRY_FILE):
+        try:
+            with open(TRANSCRIPT_RETRY_FILE, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+
+    data[vid_id] = int(data.get(vid_id, 0)) + 1
+    try:
+        with open(TRANSCRIPT_RETRY_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=1)
+    except Exception as e:
+        print(f"[자막재시도 저장 오류] {e}")
+    return data[vid_id]
 
 
 def log_rejection(reason, title, vid_id, channel=""):
@@ -1088,6 +1117,10 @@ def main():
                 log_rejection(reason, title, vid_id, channel)
             continue
 
+        # 출연이 확인된 시점에 바로 학습한다.
+        # 성공 경로 끝에 두면 길이·자막 필터에 걸릴 때마다 학습 기회를 잃는다.
+        learn_channel(channel_id, channel)
+
         # 10분 미만 영상(숏폼 등)은 요약하지 않고 건너뜀
         dur_sec = get_duration_seconds(vid_id)
         if 0 <= dur_sec < MIN_DURATION_SEC:
@@ -1108,14 +1141,24 @@ def main():
         transcript, fail_reason = get_transcript(vid_id)
         # 자막 없으면 요약/아카이브 안 함 (자막 있는 것만)
         if not transcript:
+            tries = bump_transcript_retry(vid_id)
+            if tries < TRANSCRIPT_MAX_RETRIES:
+                # 아직 자동 자막이 안 붙었을 수 있다.
+                # seen에 넣지 않으므로 다음 실행에서 자동으로 재시도된다.
+                pending_count += 1
+                print(f"[자막대기] {title} "
+                      f"({tries}/{TRANSCRIPT_MAX_RETRIES}) {fail_reason}")
+                continue
+
+            # 재시도 소진 → 포기. 이때는 조용히 버리지 않고 반드시 알린다.
             print(f"[SKIP-자막없음] {title} ({fail_reason})")
             log_rejection("no-transcript", title, vid_id, channel)
-            if NOTIFY_SKIPS:
-                send_telegram(
-                    f"⏭ *자막 없어 요약 생략*\n{title}\n{channel}\n"
-                    f"📅 {date_str}  ⏱ {duration_str}\n"
-                    f"https://www.youtube.com/watch?v={vid_id}"
-                )
+            send_telegram(
+                f"⏭ *자막 없어 요약 생략* ({TRANSCRIPT_MAX_RETRIES}회 시도)\n"
+                f"{title}\n{channel}\n"
+                f"📅 {date_str}  ⏱ {duration_str}\n"
+                f"https://www.youtube.com/watch?v={vid_id}"
+            )
             save_seen_id(vid_id)
             continue
 
@@ -1138,9 +1181,6 @@ def main():
         )
         send_telegram(video_msg)
 
-        # 출연이 확인된 채널은 자동 학습 → 다음부터 검색에 의존하지 않는다
-        learn_channel(channel_id, channel)
-
         new_items.append((title, date_str, tags, summary))
         save_seen_id(vid_id)
         new_count += 1
@@ -1161,7 +1201,7 @@ def main():
     # 보류가 있으면 조용히 넘어가지 않고 반드시 알린다.
     # 보류를 숨기면 '놓친 줄 모르는' 상태가 되어 가장 위험하다.
     pending_note = (
-        f"\n⏳ 판정 보류 {pending_count}건 (다음 실행에서 재검증)"
+        f"\n⏳ 보류 {pending_count}건 (판정·자막 대기, 다음 실행에서 재시도)"
         if pending_count else ""
     )
 
@@ -1171,9 +1211,9 @@ def main():
         print(f"완료: 신규 영상 없음 (보류 {pending_count}건)")
     else:
         if pending_note:
-            send_telegram(f"⏳ *판정 보류 {pending_count}건*\n"
-                          f"Gemini 응답 실패로 이번 실행에서는 판단을 미뤘습니다. "
-                          f"다음 실행에서 자동으로 다시 검증합니다.")
+            send_telegram(f"⏳ *보류 {pending_count}건*\n"
+                          f"출연 판정 실패 또는 자막 미생성으로 이번 실행에서는 미뤘습니다. "
+                          f"다음 실행에서 자동으로 다시 시도합니다.")
         print(f"완료: 신규 {new_count}건 알림 발송 + 아카이브 저장 "
               f"(보류 {pending_count}건)")
 
