@@ -22,6 +22,8 @@ GEMINI_API_KEY   = os.environ["GEMINI_API_KEY"]
 # Supadata 키는 없을 수도 있으니 get으로 (없으면 백업 방식만 시도)
 SUPADATA_API_KEY = os.environ.get("SUPADATA_API_KEY", "")
 
+import usage_tracker
+
 SEEN_FILE = "seen_ids.txt"
 ARCHIVE_DIR = "archive"
 KEYWORD = "이선엽"
@@ -124,6 +126,7 @@ def search_youtube():
         try:
             res = requests.get(url, params=params, timeout=30)
             data = res.json()
+            usage_tracker.youtube("search.list", 100)   # search 는 호출당 100유닛
         except Exception as e:
             print(f"[검색 오류] {page+1}페이지: {e}")
             break
@@ -228,6 +231,7 @@ def fetch_channel_uploads(channel_id, channel_name, cutoff_iso):
 
         try:
             data = requests.get(url, params=params, timeout=30).json()
+            usage_tracker.youtube("playlistItems.list", 1)
         except Exception as e:
             print(f"[채널 조회 오류] {channel_name}: {e}")
             break
@@ -312,6 +316,7 @@ def get_full_description(vid_id):
     params = {"part": "snippet", "id": vid_id, "key": YOUTUBE_API_KEY}
     try:
         res = requests.get(url, params=params, timeout=30)
+        usage_tracker.youtube("videos.list", 1, video=vid_id)
         items = res.json().get("items", [])
         if not items:
             return ""
@@ -321,9 +326,10 @@ def get_full_description(vid_id):
         return ""
 
 
+GEMINI_MODEL = "gemini-3.1-flash-lite"
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
-    f"gemini-3.1-flash-lite:generateContent?key={GEMINI_API_KEY}"
+    f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 )
 
 
@@ -344,6 +350,9 @@ def call_gemini(prompt, tag="Gemini", timeout=90, retries=3):
         except Exception as e:
             print(f"[{tag} 요청 오류] {type(e).__name__}")
             return None, f"요청 오류: {type(e).__name__}"
+
+        # 재시도마다 토큰이 따로 나가므로 루프 안에서 기록한다.
+        usage_tracker.gemini(data, model=GEMINI_MODEL, action=f"call:{tag}")
 
         err = data.get("error", {})
         code = err.get("code")
@@ -527,6 +536,7 @@ def get_duration(vid_id):
         "key": YOUTUBE_API_KEY,
     }
     res = requests.get(url, params=params)
+    usage_tracker.youtube("videos.list", 1, video=vid_id)
     items = res.json().get("items", [])
     if not items:
         return "알 수 없음"
@@ -550,6 +560,7 @@ def get_duration_seconds(vid_id):
     url = "https://www.googleapis.com/youtube/v3/videos"
     params = {"part": "contentDetails", "id": vid_id, "key": YOUTUBE_API_KEY}
     res = requests.get(url, params=params)
+    usage_tracker.youtube("videos.list", 1, video=vid_id)
     items = res.json().get("items", [])
     if not items:
         return -1
@@ -583,6 +594,9 @@ def _transcript_via_supadata(vid_id):
     except Exception as e:
         return None, f"Supadata 요청 오류: {type(e).__name__}"
 
+    # 206(자막 없음)도 1크레딧이 나가므로 상태코드와 무관하게 기록한다.
+    usage_tracker.supadata(res, video=vid_id, mode="auto")
+
     # 성공 (즉시 반환)
     if res.status_code == 200:
         data = res.json()
@@ -607,6 +621,7 @@ def _transcript_via_supadata(vid_id):
                 continue
             status = pdata.get("status")
             if status == "completed":
+                usage_tracker.supadata(pr, video=vid_id, mode="auto:job")
                 content = pdata.get("content", "")
                 if isinstance(content, list):
                     content = " ".join(seg.get("text", "") for seg in content)
@@ -904,6 +919,7 @@ def audit_missed():
             params["pageToken"] = page_token
         try:
             data = requests.get(url, params=params, timeout=30).json()
+            usage_tracker.youtube("search.list", 100, note="audit")
         except Exception as e:
             print(f"[점검 오류] {e}")
             break
