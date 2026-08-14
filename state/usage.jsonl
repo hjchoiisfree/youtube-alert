@@ -1,0 +1,33 @@
+{"ts": "2026-08-14T07:41:24Z", "provider": "youtube", "action": "search.list", "units": 100, "unit": "quota", "run": "31780886996"}
+{"ts": "2026-08-14T07:41:26Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "31780886996"}
+{"ts": "2026-08-14T07:41:26Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "31780886996"}
+{"ts": "2026-08-14T07:41:29Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "31780886996"}
+{"ts": "2026-08-14T07:41:33Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "31780886996"}
+{"ts": "2026-08-14T07:41:33Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "31780886996"}
+{"ts": "2026-08-14T07:41:34Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "31780886996"}
+{"ts": "2026-08-14T07:41:34Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "31780886996"}
+{"ts": "2026-08-14T07:41:34Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "31780886996"}
+{"ts": "2026-08-14T07:41:34Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "31780886996"}
+{"ts": "2026-08-14T07:41:35Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "31780886996"}
+{"ts": "2026-08-14T07:41:35Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "31780886996"}
+{"ts": "2026-08-14T07:41:36Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "31780886996"}
+{"ts": "2026-08-14T07:41:36Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "31780886996"}
+{"ts": "2026-08-14T07:41:36Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "31780886996", "video": "FHAq9EqMTqg"}
+{"ts": "2026-08-14T07:41:36Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "31780886996", "video": "uUGuMWq6aww"}
+{"ts": "2026-08-14T07:41:36Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "31780886996", "video": "fCRc4cj59FA"}
+{"ts": "2026-08-14T07:41:37Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "31780886996", "video": "fCRc4cj59FA"}
+{"ts": "2026-08-14T07:41:39Z", "provider": "supadata", "action": "transcript", "units": 0.0, "unit": "credit", "run": "31780886996", "video": "fCRc4cj59FA", "mode": "auto", "status": 400, "header_missing": true}
+{"ts": "2026-08-14T07:41:40Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "31780886996", "video": "n-CukL-VFvU"}
+{"ts": "2026-08-14T07:41:40Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "31780886996", "video": "n-CukL-VFvU"}
+{"ts": "2026-08-14T07:41:42Z", "provider": "supadata", "action": "transcript", "units": 0.0, "unit": "credit", "run": "31780886996", "video": "n-CukL-VFvU", "mode": "auto", "status": 400, "header_missing": true}
+{"ts": "2026-08-14T07:41:44Z", "provider": "gemini", "action": "call:출연검증", "units": 1564, "unit": "token", "run": "31780886996", "model": "gemini-3.1-flash-lite", "in_tokens": 1563, "out_tokens": 1}
+{"ts": "2026-08-14T07:42:09Z", "provider": "gemini", "action": "call:출연검증", "units": 0, "unit": "token", "run": "31780886996", "model": "gemini-3.1-flash-lite", "in_tokens": 0, "out_tokens": 0}
+{"ts": "2026-08-14T07:42:31Z", "provider": "gemini", "action": "call:출연검증", "units": 0, "unit": "token", "run": "31780886996", "model": "gemini-3.1-flash-lite", "in_tokens": 0, "out_tokens": 0}
+{"ts": "2026-08-14T07:42:36Z", "provider": "gemini", "action": "call:출연검증", "units": 1609, "unit": "token", "run": "31780886996", "model": "gemini-3.1-flash-lite", "in_tokens": 1608, "out_tokens": 1}
+{"ts": "2026-08-14T07:42:57Z", "provider": "gemini", "action": "call:출연검증", "units": 1603, "unit": "token", "run": "31780886996", "model": "gemini-3.1-flash-lite", "in_tokens": 1602, "out_tokens": 1}
+{"ts": "2026-08-14T07:43:00Z", "provider": "gemini", "action": "call:출연검증", "units": 1624, "unit": "token", "run": "31780886996", "model": "gemini-3.1-flash-lite", "in_tokens": 1623, "out_tokens": 1}
+{"ts": "2026-08-14T07:43:01Z", "provider": "gemini", "action": "call:출연검증", "units": 1620, "unit": "token", "run": "31780886996", "model": "gemini-3.1-flash-lite", "in_tokens": 1619, "out_tokens": 1}
+{"ts": "2026-08-14T07:43:02Z", "provider": "gemini", "action": "call:출연검증", "units": 1600, "unit": "token", "run": "31780886996", "model": "gemini-3.1-flash-lite", "in_tokens": 1599, "out_tokens": 1}
+{"ts": "2026-08-14T07:43:04Z", "provider": "gemini", "action": "call:출연검증", "units": 1597, "unit": "token", "run": "31780886996", "model": "gemini-3.1-flash-lite", "in_tokens": 1596, "out_tokens": 1}
+{"ts": "2026-08-14T07:43:04Z", "provider": "gemini", "action": "call:출연검증", "units": 1603, "unit": "token", "run": "31780886996", "model": "gemini-3.1-flash-lite", "in_tokens": 1602, "out_tokens": 1}
+{"ts": "2026-08-14T07:43:43Z", "provider": "gemini", "action": "call:출연검증", "units": 1642, "unit": "token", "run": "31780886996", "model": "gemini-3.1-flash-lite", "in_tokens": 1641, "out_tokens": 1}

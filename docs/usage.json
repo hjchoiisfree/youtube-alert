@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-08-14T07:43:44Z",
+  "month": "2026-08",
+  "supadata": {
+    "plan": "Free (100/mo)",
+    "used": 26,
+    "max": 100,
+    "ledger_used": 0.0,
+    "live": true,
+    "burn_per_day": 1.95,
+    "projected_month": 60.5,
+    "days_until_empty": 37.9
+  },
+  "youtube": {
+    "today_units": 119,
+    "daily_quota": 10000,
+    "month_units": 119,
+    "resets": "매일 태평양시 자정 (한국시간 오후 4~5시)"
+  },
+  "llm": [
+    {
+      "key": "gemini/gemini-3.1-flash-lite",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "calls": 11,
+      "in_tokens": 14453,
+      "out_tokens": 9,
+      "cost_usd": 0.0036
+    }
+  ],
+  "daily": [
+    {
+      "date": "2026-08-14",
+      "youtube": 119.0,
+      "supadata": 0.0,
+      "gemini": 14462.0
+    }
+  ],
+  "videos_this_month": 4
+}
