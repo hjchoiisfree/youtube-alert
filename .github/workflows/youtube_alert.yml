@@ -31,6 +31,12 @@ jobs:
           GEMINI_API_KEY:   ${{ secrets.GEMINI_API_KEY }}
           SUPADATA_API_KEY: ${{ secrets.SUPADATA_API_KEY }}
         run: python checker.py
+      - name: 사용량 집계
+        if: always()
+        env:
+          SUPADATA_API_KEY: ${{ secrets.SUPADATA_API_KEY }}
+        run: python build_usage.py
+
       - name: 저장
         if: always()
         run: |
@@ -39,6 +45,7 @@ jobs:
           touch seen_ids.txt
           mkdir -p archive
           git add seen_ids.txt archive/ 2>/dev/null || true
+          git add state/ docs/ 2>/dev/null || true
           git add 관점_종합.md 2>/dev/null || true
           git add channels.json 2>/dev/null || true
           git add rejected.log 2>/dev/null || true
