@@ -56,6 +56,9 @@ VERDICT_FALSE_TTL_DAYS = 14
 # 자동 자막은 업로드 직후 안 붙는 경우가 많아, 한 번 실패했다고 버리면 안 된다.
 TRANSCRIPT_RETRY_FILE = "transcript_retry.json"
 TRANSCRIPT_MAX_RETRIES = 3   # 하루 1회 실행이므로 사실상 3일간 재시도
+# 요약 실패(모델 과부하)는 대개 몇 분~몇 시간이면 풀린다.
+# 실행이 하루 2~3회이므로 4회면 하루 반 정도 재시도하는 셈이다.
+SUMMARY_MAX_RETRIES = 4
 
 # 놓침 점검 주기(일)와 조회 범위(일)
 AUDIT_INTERVAL_DAYS = 7
@@ -70,6 +73,41 @@ def _has_keyword(text):
     if not text:
         return False
     return any(k in text for k in KEYWORD_VARIANTS)
+
+
+# 설명란의 광고·상용구 줄을 식별하는 표지들.
+# 이런 줄에만 이름이 있으면 출연이 아니라 홍보 문구다.
+AD_MARKERS = (
+    "http://", "https://", "👉", "문의", "구독", "할인", "이벤트", "신청",
+    "쿠폰", "고객센터", "편성표", "앱 설치", "바로가기", "클래스", "서비스",
+)
+
+
+def looks_like_boilerplate(description):
+    """키워드가 광고·상용구 줄에만 등장하는지 판단한다.
+
+    삼프로TV는 모든 영상 설명란에
+      '🔥박병창&이선엽&김장열&이권희&장우진&박명석을 지금 만나보세요!'
+    같은 구독 서비스 광고를 넣는다. 그래서 이선엽이 출연하지 않는 영상도
+    전부 Gemini 출연검증으로 넘어가 호출을 낭비하고 429를 유발한다.
+    하루 수십 건을 올리는 채널이라 비용이 그대로 누적된다.
+
+    판정은 보수적으로 한다. 키워드가 등장하는 줄 중 하나라도 광고로
+    보이지 않으면 False를 돌려 Gemini에게 맡긴다.
+    (놓치는 것보다 한 번 더 묻는 쪽이 낫다.)
+    """
+    lines = [ln.strip() for ln in description.split("\n") if _has_keyword(ln)]
+    if not lines:
+        return False
+
+    for line in lines:
+        has_marker = any(m in line for m in AD_MARKERS)
+        # 'A&B&C' 처럼 이름을 나열한 홍보 문구도 상용구로 본다
+        is_name_list = line.count("&") >= 2
+        if not (has_marker or is_name_list):
+            return False   # 광고가 아닌 줄이 있다 → 판정 보류
+
+    return True
 
 # 요약에 넣을 자막 최대 길이 (토큰/비용 절약)
 MAX_TRANSCRIPT_CHARS = 20000
@@ -697,6 +735,13 @@ def matches_keyword(title, snippet_desc, vid_id, desc_is_full=False,
     if not _has_keyword(description):
         return False, "no-keyword"
 
+    # 광고 상용구에만 이름이 있으면 Gemini를 부르지 않는다.
+    # 이 채널들은 매일 수십 건을 올리므로 여기서 막지 않으면
+    # 출연검증 호출이 폭증해 rate limit이 걸린다.
+    if looks_like_boilerplate(description):
+        save_verdict(vid_id, False)   # 캐시해서 다음 실행의 설명 조회까지 아낀다
+        return False, "boilerplate"
+
     # 판정 '이전에' 채널을 후보로 기록한다.
     # Gemini가 NO를 내도, 판정에 실패해도 채널은 남긴다.
     # 여기서 기록하지 않으면 놓친 채널을 알게 될 방법이 없다.
@@ -713,8 +758,14 @@ def matches_keyword(title, snippet_desc, vid_id, desc_is_full=False,
     return (True, "gemini-ok") if verdict else (False, "gemini-no")
 
 
-def bump_transcript_retry(vid_id):
-    """자막 실패 횟수를 1 올리고 현재 횟수를 반환한다."""
+def bump_transcript_retry(vid_id, kind="transcript"):
+    """실패 횟수를 1 올리고 현재 횟수를 반환한다.
+
+    kind로 실패 종류를 구분한다(transcript / summary).
+    요약 실패도 같은 원장을 쓰되 키를 분리해, 자막은 됐는데 요약만
+    실패한 경우가 자막 재시도 횟수를 갉아먹지 않게 한다.
+    """
+    key = vid_id if kind == "transcript" else f"{kind}:{vid_id}"
     data = {}
     if os.path.exists(TRANSCRIPT_RETRY_FILE):
         try:
@@ -723,13 +774,13 @@ def bump_transcript_retry(vid_id):
         except Exception:
             data = {}
 
-    data[vid_id] = int(data.get(vid_id, 0)) + 1
+    data[key] = int(data.get(key, 0)) + 1
     try:
         with open(TRANSCRIPT_RETRY_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=1)
     except Exception as e:
-        print(f"[자막재시도 저장 오류] {e}")
-    return data[vid_id]
+        print(f"[재시도 저장 오류] {e}")
+    return data[key]
 
 
 def log_rejection(reason, title, vid_id, channel=""):
@@ -927,7 +978,11 @@ def summarize_with_gemini(title, transcript):
 
     text, err = call_gemini(prompt, tag="요약", timeout=90)
     if err or not text:
-        return f"요약 실패 ({err})"
+        # 실패를 문자열로 돌려주면 호출부가 성공으로 착각한다.
+        # 예전에는 '요약 실패 (...)' 문자열이 그대로 아카이브에 저장되고
+        # seen_ids에까지 들어가, 모델이 잠깐 붐볐다는 이유로 요약을 영구히 잃었다.
+        print(f"[요약 실패] {err}")
+        return None
     return text
 
 
@@ -1008,10 +1063,17 @@ def save_archive(vid_id, title, channel, date_str, duration_str,
 # ────────────────────────────────────────────────
 
 def format_date(published_at):
+    """발행 시각을 KST로 표시한다.
+
+    '17:00' 형태로 쓰면 안 된다. 텔레그램은 메시지에 유튜브 링크가 있을 때
+    본문의 HH:MM 패턴을 영상 타임스탬프 링크로 자동 변환한다.
+    그래서 발행 시각이 '17분 지점으로 이동' 링크로 둔갑한다.
+    콜론을 쓰지 않으면 이 자동 변환이 걸리지 않는다.
+    """
     dt = datetime.strptime(published_at, "%Y-%m-%dT%H:%M:%SZ")
     dt = dt.replace(tzinfo=timezone.utc)
     kst = dt.astimezone(KST)
-    return kst.strftime("%Y년 %m월 %d일 %H:%M")
+    return kst.strftime("%Y년 %m월 %d일 %H시 %M분")
 
 
 def to_telegram(md):
@@ -1109,6 +1171,10 @@ def audit_missed():
     그중 seen_ids에 없는 것을 후보로 보고한다.
     자동 처리하지 않고 사람이 판단하도록 목록만 알린다."""
     seen = get_seen_ids()
+    # 이미 판정이 끝난 영상은 '놓친 것'이 아니다.
+    # gemini-no로 걸러진 영상은 seen_ids에 들어가지 않으므로(의도된 설계),
+    # seen만 보면 정상적으로 걸러낸 건이 전부 후보로 올라와 노이즈에 묻힌다.
+    judged = set(load_verdicts().keys())
     url = "https://www.googleapis.com/youtube/v3/search"
     published_after = (
         datetime.now(timezone.utc) - timedelta(days=AUDIT_LOOKBACK_DAYS)
@@ -1145,7 +1211,7 @@ def audit_missed():
 
             for it in data.get("items", []):
                 vid = it["id"].get("videoId")
-                if not vid or vid in seen or vid in found:
+                if not vid or vid in seen or vid in judged or vid in found:
                     continue
                 found.add(vid)
                 title = html.unescape(it["snippet"]["title"])
@@ -1157,6 +1223,10 @@ def audit_missed():
 
     mark_audit_done()
 
+    # 제목에 이름이 있는데도 미처리인 건이 진짜 위험 신호다. 맨 위로 올린다.
+    candidates.sort(key=lambda c: (not _has_keyword(c[1]), c[1]))
+    strong = [c for c in candidates if _has_keyword(c[1])]
+
     if not candidates:
         print("[놓침 점검] 후보 없음")
         send_telegram(
@@ -1165,16 +1235,23 @@ def audit_missed():
         )
         return
 
-    print(f"[놓침 점검] 후보 {len(candidates)}건")
+    print(f"[놓침 점검] 후보 {len(candidates)}건 (제목 매치 {len(strong)}건)")
     lines = [
         f"🔍 *놓침 점검* (최근 {AUDIT_LOOKBACK_DAYS}일)",
-        f"seen_ids에 없는 검색 결과 {len(candidates)}건입니다.",
-        "실제 출연작이 섞여 있으면 필터 개선이 필요합니다.\n",
     ]
-    for vid, title, ch in candidates[:15]:
-        lines.append(f"• {title[:60]}\n  {ch}\n  https://www.youtube.com/watch?v={vid}")
-    if len(candidates) > 15:
-        lines.append(f"\n…외 {len(candidates) - 15}건")
+    if strong:
+        lines.append(f"⚠️ *제목에 이름이 있는데 미처리: {len(strong)}건* — 확인 필요")
+    else:
+        lines.append(f"제목 매치 미처리 0건. 아래는 판정 이력이 없는 참고 후보 "
+                     f"{len(candidates)}건입니다.")
+    lines.append("")
+
+    for vid, title, ch in candidates[:10]:
+        mark = "⚠️ " if _has_keyword(title) else "• "
+        lines.append(f"{mark}{title[:60]}\n  {ch}\n"
+                     f"  https://www.youtube.com/watch?v={vid}")
+    if len(candidates) > 10:
+        lines.append(f"\n…외 {len(candidates) - 10}건")
 
     send_telegram(clip("\n".join(lines)))
 
@@ -1416,6 +1493,29 @@ def process_video(item, seen, stats):
         return
 
     summary = summarize_with_gemini(title, transcript)
+
+    # 요약 실패는 대개 모델 과부하(일시적)다. seen에 넣지 않고 보류하면
+    # 다음 실행에서 자동으로 재시도된다. 자막은 이미 확보됐으므로
+    # Supadata 크레딧이 추가로 들지 않는다.
+    if not summary:
+        tries = bump_transcript_retry(vid_id, kind="summary")
+        if tries < SUMMARY_MAX_RETRIES:
+            stats.pending.append(
+                (title, vid_id, f"요약 재시도 {tries}/{SUMMARY_MAX_RETRIES}")
+            )
+            print(f"[요약대기] {title} ({tries}/{SUMMARY_MAX_RETRIES})")
+            return
+        # 재시도 소진 → 요약 없이라도 영상 존재는 알린다
+        print(f"[요약포기] {title}")
+        stats.skipped.append(("summary-failed", title, vid_id))
+        send_telegram(
+            f"⚠️ *요약 실패* ({SUMMARY_MAX_RETRIES}회 시도)\n"
+            f"{title}\n{channel}\n"
+            f"📅 {date_str}  ⏱ {duration_str}\n{url}"
+        )
+        save_seen_id(vid_id)
+        return
+
     tags = extract_topics(title, transcript)
 
     # 아카이브에 노트 저장 (누적)
