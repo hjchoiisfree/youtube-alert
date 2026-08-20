@@ -3,7 +3,9 @@ import re
 import json
 import html
 import time
+import traceback
 import requests
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 
 KST = timezone(timedelta(hours=9))  # 한국 시간 (GitHub Actions 러너는 UTC라서 명시 필요)
@@ -34,6 +36,11 @@ KEYWORD_VARIANTS = ["이선엽", "이선혁", "이 선엽", "이선 엽"]
 
 # 자동 학습된 출연 채널 목록 (git에 커밋되어 실행 간 유지된다)
 CHANNELS_FILE = "channels.json"
+# 후보 채널: 설명란에 이름이 등장했으나 아직 출연 확정이 안 된 채널.
+# RSS(쿼터 0)로만 감시하므로 오탐 비용이 사실상 없다.
+# 이것이 없으면 '놓친 채널은 영원히 놓친다'는 자기강화 사각지대가 생긴다.
+CANDIDATE_FILE = "candidates.json"
+CANDIDATE_PROMOTE_HITS = 2   # 이름이 이만큼 등장하면 정식 채널로 승격
 # 필터에서 걸러진 영상 기록 (Gemini 오판 사후 검증용)
 REJECTED_LOG = "rejected.log"
 # 마지막 놓침 점검 실행일
@@ -42,6 +49,9 @@ AUDIT_FILE = "last_audit.txt"
 # 같은 영상을 매 실행마다 Gemini에 다시 묻는 낭비를 막는다.
 # 이것이 없으면 800건 규모에서 rate limit이 반드시 터진다.
 VERDICT_FILE = "verdicts.json"
+# 미출연 판정의 유효기간. 오판이 영구 박제되는 것을 막는다.
+# True 판정은 만료시키지 않는다 (한 번 출연이면 계속 출연이다).
+VERDICT_FALSE_TTL_DAYS = 14
 # 자막 확보 실패 영상의 재시도 횟수 (git 커밋되어 실행 간 유지)
 # 자동 자막은 업로드 직후 안 붙는 경우가 많아, 한 번 실패했다고 버리면 안 된다.
 TRANSCRIPT_RETRY_FILE = "transcript_retry.json"
@@ -94,55 +104,78 @@ def save_seen_id(vid_id):
 # 검색 경로: search.list 는 색인 지연이 있어 넓게 잡는다.
 # 좁히면 '어제 놓친 영상'이 창 밖으로 밀려 영구 누락된다. seen_ids 로 중복을 거른다.
 LOOKBACK_DAYS = 14
-# 채널 순회 경로: 지연이 없어 짧아도 안전. 다작 채널의 페이지 낭비를 막는다.
-CHANNEL_LOOKBACK_DAYS = 3
+# 채널 순회 경로: RSS가 1차라 페이지 비용이 낮아졌으므로 3일 → 7일로 넓힌다.
+# 3일은 '금요일 밤에 놓치면 월요일엔 창 밖'이 되는 위험한 폭이었다.
+CHANNEL_LOOKBACK_DAYS = 7
 # 쿼터 보호용 최대 페이지 수 (1페이지=50개, 검색 1회당 쿼터 100 소모)
-MAX_SEARCH_PAGES = 3
+# 쿼리 수가 늘었으므로 쿼리당 페이지는 줄인다.
+MAX_SEARCH_PAGES = 2
+
+# 검색에 사용할 (쿼리, 정렬) 조합.
+# 단일 쿼리로는 YouTube의 관련성 게이트에 걸려 결과가 임의로 잘린다.
+# 특히 제목·tags에 이름이 없고 설명란에만 있는 영상이 누락된다.
+# (실제 누락 사례: mynVdWBBU38 / 교양이를 부탁해 / 2026-08-19)
+SEARCH_QUERIES = [
+    ("이선엽",      "date"),
+    ("이선엽",      "relevance"),   # date와 다른 결과 집합이 나온다
+    ("AFW파트너스", "date"),        # 현 소속. 설명란에 거의 항상 등장한다
+]
 
 
 def search_youtube():
-    """'이선엽' 검색 결과를 최신순으로 페이지 넘기며 수집한다.
-    최근 LOOKBACK_DAYS일 이내 영상만, 최대 MAX_SEARCH_PAGES 페이지(150개)까지."""
+    """여러 쿼리·정렬로 검색해 합집합을 만든다.
+    최근 LOOKBACK_DAYS일 이내 영상만, 쿼리당 최대 MAX_SEARCH_PAGES 페이지."""
     url = "https://www.googleapis.com/youtube/v3/search"
     published_after = (
         datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)
     ).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    all_items = []
-    page_token = None
-    for page in range(MAX_SEARCH_PAGES):
-        params = {
-            "part": "snippet",
-            "q": KEYWORD,
-            "type": "video",
-            "order": "date",
-            "maxResults": 50,
-            "publishedAfter": published_after,
-            "key": YOUTUBE_API_KEY,
-        }
-        if page_token:
-            params["pageToken"] = page_token
+    all_items, seen_vids = [], set()
 
-        try:
-            res = requests.get(url, params=params, timeout=30)
-            data = res.json()
-            usage_tracker.youtube("search.list", 100)   # search 는 호출당 100유닛
-        except Exception as e:
-            print(f"[검색 오류] {page+1}페이지: {e}")
-            break
+    for query, order in SEARCH_QUERIES:
+        page_token = None
+        for page in range(MAX_SEARCH_PAGES):
+            params = {
+                "part": "snippet",
+                "q": query,
+                "type": "video",
+                "order": order,
+                "maxResults": 50,
+                "publishedAfter": published_after,
+                "key": YOUTUBE_API_KEY,
+            }
+            if page_token:
+                params["pageToken"] = page_token
 
-        if "error" in data:
-            print(f"[검색 API 오류] {data['error'].get('message', '')[:80]}")
-            break
+            try:
+                res = requests.get(url, params=params, timeout=30)
+                data = res.json()
+                # search 는 호출당 100유닛. 예외가 나도 호출은 이미 나갔을 수 있다.
+                usage_tracker.youtube("search.list", 100, note=f"{query}:{order}")
+            except Exception as e:
+                print(f"[검색 오류] {query}/{order} {page+1}p: {type(e).__name__}")
+                break
 
-        items = data.get("items", [])
-        all_items.extend(items)
-        print(f"[검색] {page+1}페이지: {len(items)}건 (누적 {len(all_items)}건)")
+            if "error" in data:
+                print(f"[검색 API 오류] {query}/{order}: "
+                      f"{data['error'].get('message', '')[:80]}")
+                break
 
-        page_token = data.get("nextPageToken")
-        if not page_token or not items:
-            break  # 더 이상 페이지 없음 → 기간 내 영상 전부 수집 완료
+            items = data.get("items", [])
+            fresh = 0
+            for it in items:
+                vid = it.get("id", {}).get("videoId")
+                if vid and vid not in seen_vids:
+                    seen_vids.add(vid)
+                    all_items.append(it)
+                    fresh += 1
+            print(f"[검색:{query}/{order}] {page+1}p {len(items)}건 (신규 {fresh})")
 
+            page_token = data.get("nextPageToken")
+            if not page_token or not items:
+                break
+
+    print(f"[검색 합계] {len(all_items)}건")
     return all_items
 
 
@@ -153,6 +186,11 @@ CHANNELS = {
     "UC6kZpTl39-_SqfBrF1-N2oQ": "연합뉴스경제TV",
     "UCD0k4Kq7SJROxxV-9N5v8IA": "깨비증권 마블TV [KB증권]",
     "UCIUni4ScRp4mqPXsxy62L5w": "언더스탠딩 : 세상의 모든 지식",
+    # ── 2026-08-20 추가 ────────────────────────────────────────
+    # 보통 제목에 '(ft.이선엽 AFW파트너스 대표)'를 넣지만, 가끔 빼고
+    # 설명란의 '컨트리뷰터' 표기로만 남긴다. 그 경우 검색으로 잡히지 않으므로
+    # 반드시 채널 순회로 커버해야 한다.
+    "UChY8VUjXv0aA7RF9hDQ0ISg": "교양이를 부탁해 (SBS)",
 }
 
 # 채널당 조회할 최대 페이지 수 (1페이지=50개).
@@ -211,6 +249,119 @@ def learn_channel(channel_id, channel_name):
         print(f"[채널목록 저장 오류] {e}")
 
 
+def note_candidate_channel(channel_id, channel_name, vid_id):
+    """설명란에 이름이 등장한 채널을 '후보'로 기록한다.
+
+    Gemini가 NO를 냈든 판정 불가였든 상관없이 기록하는 것이 핵심이다.
+    기존 learn_channel은 '필터를 통과한' 영상에서만 호출되는데,
+    그러면 놓친 영상에서는 학습이 일어나지 않는다.
+    채널 등록이 놓침을 막는 수단인데 놓치면 등록이 안 되는 순환이 생긴다.
+
+    후보 채널은 RSS(쿼터 0)로만 감시하므로 오탐 비용이 사실상 없다.
+    따라서 문턱을 과감히 낮춰도 된다.
+    """
+    if not channel_id:
+        return
+
+    data = {}
+    if os.path.exists(CANDIDATE_FILE):
+        try:
+            with open(CANDIDATE_FILE, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+
+    today = datetime.now(KST).strftime("%Y-%m-%d")
+    entry = data.setdefault(
+        channel_id, {"name": channel_name, "added": today, "seen": []}
+    )
+    entry["name"] = channel_name or entry.get("name", channel_id)
+    if vid_id and vid_id not in entry["seen"]:
+        entry["seen"].append(vid_id)
+    entry["last_seen"] = today
+
+    try:
+        with open(CANDIDATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[후보채널 저장 오류] {e}")
+
+    if len(entry["seen"]) >= CANDIDATE_PROMOTE_HITS:
+        print(f"[채널 승격] {channel_name} (이름 등장 {len(entry['seen'])}회)")
+        learn_channel(channel_id, channel_name)
+
+
+def load_candidate_channels():
+    """후보 채널 목록 {id: name}. RSS 전용으로만 순회한다."""
+    if not os.path.exists(CANDIDATE_FILE):
+        return {}
+    try:
+        with open(CANDIDATE_FILE, encoding="utf-8") as f:
+            return {cid: v.get("name", cid) for cid, v in json.load(f).items()}
+    except Exception as e:
+        print(f"[후보채널 로드 오류] {e}")
+        return {}
+
+
+RSS_NS = {
+    "a":  "http://www.w3.org/2005/Atom",
+    "yt": "http://www.youtube.com/xml/schemas/2015",
+}
+
+
+def fetch_channel_rss(channel_id, channel_name, cutoff_iso):
+    """채널 RSS 피드로 최신 15개를 가져온다.
+
+    playlistItems 대비 결정적 장점 두 가지:
+      - API 쿼터 0
+      - 색인 지연 없음 (발행 즉시 반영)
+
+    search.list는 색인 지연과 관련성 게이트 때문에 신규 영상을 놓치는데,
+    RSS는 이 두 문제를 모두 우회한다. 그래서 채널의 1차 경로로 쓴다.
+
+    단점은 최신 15개만 준다는 것과 설명란이 잘려서 온다는 것이다.
+    그래서 _full_desc=False로 두어 matches_keyword가 videos.list로
+    전체 설명을 다시 가져오게 한다.
+    """
+    url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+    try:
+        res = requests.get(url, timeout=20)
+        if res.status_code != 200:
+            print(f"[RSS] {channel_name}: HTTP {res.status_code}")
+            return []
+        root = ET.fromstring(res.content)
+    except Exception as e:
+        print(f"[RSS 오류] {channel_name}: {type(e).__name__}")
+        return []
+
+    out = []
+    for entry in root.findall("a:entry", RSS_NS):
+        vid = entry.findtext("yt:videoId", default="", namespaces=RSS_NS)
+        pub = entry.findtext("a:published", default="", namespaces=RSS_NS)
+        title = entry.findtext("a:title", default="", namespaces=RSS_NS)
+        if not vid or len(pub) < 19:
+            continue
+        # '2026-08-19T12:05:17+00:00' → '2026-08-19T12:05:17Z'
+        pub_iso = pub[:19] + "Z"
+        if pub_iso < cutoff_iso:
+            continue        # break 아님: RSS도 순서가 뒤집힐 수 있다
+        out.append({
+            "id": {"videoId": vid},
+            "snippet": {
+                "title": html.unescape(title or ""),
+                "channelTitle": channel_name,
+                "channelId": channel_id,
+                "publishedAt": pub_iso,
+                "description": "",
+            },
+            "_full_desc": False,
+        })
+
+    if out:
+        print(f"[RSS] {channel_name}: {len(out)}건")
+    return out
+
+
 def fetch_channel_uploads(channel_id, channel_name, cutoff_iso):
     """채널 업로드 플레이리스트를 최신순으로 읽어 cutoff 이후 영상만 반환.
     업로드 플레이리스트 ID는 채널ID의 'UC'를 'UU'로 바꾼 값이다.
@@ -218,6 +369,8 @@ def fetch_channel_uploads(channel_id, channel_name, cutoff_iso):
     playlist_id = "UU" + channel_id[2:]
     url = "https://www.googleapis.com/youtube/v3/playlistItems"
     out, page_token = [], None
+    stale_streak = 0        # 연속으로 나온 '기간 밖' 항목 수
+    STALE_LIMIT = 25        # 이만큼 연속되면 진짜 기간 밖으로 판단
 
     for _ in range(MAX_CHANNEL_PAGES):
         params = {
@@ -241,14 +394,18 @@ def fetch_channel_uploads(channel_id, channel_name, cutoff_iso):
                   f"{data['error'].get('message', '')[:80]}")
             break
 
-        stop = False
         for it in data.get("items", []):
             pub = it["contentDetails"].get("videoPublishedAt", "")
             if not pub:
                 continue
-            if pub < cutoff_iso:      # 최신순 정렬이므로 기간을 벗어나면 중단
-                stop = True
-                break
+            if pub < cutoff_iso:
+                # 즉시 중단하지 않는다. 업로드 플레이리스트는 '플레이리스트에
+                # 추가된 순서'라서 videoPublishedAt 내림차순이 아니다.
+                # 라이브·프리미어·예약발행·비공개→공개 전환이 섞이면 순서가
+                # 뒤집히는데, 여기서 break하면 그 뒤 항목 전체를 못 본다.
+                stale_streak += 1
+                continue
+            stale_streak = 0
             # search 결과와 같은 형태로 맞춰서 main()이 그대로 처리하게 함
             out.append({
                 "id": {"videoId": it["contentDetails"]["videoId"]},
@@ -263,7 +420,8 @@ def fetch_channel_uploads(channel_id, channel_name, cutoff_iso):
                 "_full_desc": True,
             })
 
-        if stop or not data.get("nextPageToken"):
+        # 기간 밖 항목이 충분히 연속으로 나왔을 때만 진짜 끝으로 본다
+        if stale_streak >= STALE_LIMIT or not data.get("nextPageToken"):
             break
         page_token = data["nextPageToken"]
 
@@ -292,19 +450,38 @@ def collect_videos():
             merged.append(item)
     search_count = len(merged)
 
-    channels = load_channels()
-    print(f"[채널 목록] 총 {len(channels)}개 "
-          f"(시드 {len(CHANNELS)} + 학습 {len(channels) - len(CHANNELS)})")
-
-    for cid, cname in channels.items():
-        for item in fetch_channel_uploads(cid, cname, channel_cutoff):
+    def _absorb(items):
+        added = 0
+        for item in items:
             vid = item["id"]["videoId"]
             if vid not in seen_vids:
                 seen_vids.add(vid)
                 merged.append(item)
+                added += 1
+        return added
+
+    channels = load_channels()
+    print(f"[채널 목록] 정식 {len(channels)}개")
+
+    # 정식 채널: RSS(빠름·무료)를 먼저, playlistItems로 보완
+    for cid, cname in channels.items():
+        _absorb(fetch_channel_rss(cid, cname, channel_cutoff))
+        _absorb(fetch_channel_uploads(cid, cname, channel_cutoff))
+    channel_count = len(merged) - search_count
+
+    # 후보 채널: 아직 출연 확정은 아니지만 이름이 등장한 적 있는 채널.
+    # RSS만 쓰므로 쿼터를 전혀 소모하지 않는다.
+    candidates = load_candidate_channels()
+    for cid, cname in candidates.items():
+        if cid in channels:
+            continue
+        _absorb(fetch_channel_rss(cid, cname, channel_cutoff))
+    cand_count = len(merged) - search_count - channel_count
+    if candidates:
+        print(f"[후보 채널] {len(candidates)}개 → {cand_count}건")
 
     print(f"[수집 완료] 총 {len(merged)}건 "
-          f"(검색 {search_count} + 채널 {len(merged) - search_count})")
+          f"(검색 {search_count} + 채널 {channel_count} + 후보 {cand_count})")
     return merged
 
 
@@ -382,15 +559,42 @@ def call_gemini(prompt, tag="Gemini", timeout=90, retries=3):
 
 
 def load_verdicts():
-    """확정된 출연검증 결과를 불러온다. {video_id: true/false}"""
+    """확정된 출연검증 결과를 불러온다. {video_id: true/false}
+
+    False 판정은 VERDICT_FALSE_TTL_DAYS가 지나면 없는 것으로 취급한다.
+    모델이 한 번 오판하면 그 영상이 영구히 복구되지 않는 문제를 막기 위함이다.
+    True는 만료시키지 않는다 (한 번 출연이면 계속 출연이다).
+
+    저장 형식: {"v": bool, "at": "YYYY-MM-DD"}
+    구 형식(bool)도 그대로 읽는다.
+    """
     if not os.path.exists(VERDICT_FILE):
         return {}
     try:
         with open(VERDICT_FILE, encoding="utf-8") as f:
-            return json.load(f)
+            raw = json.load(f)
     except Exception as e:
         print(f"[검증캐시 로드 오류] {e}")
         return {}
+
+    today = datetime.now(KST).date()
+    out = {}
+    for vid, val in raw.items():
+        if isinstance(val, bool):          # 구 형식 호환
+            out[vid] = val
+            continue
+        if not isinstance(val, dict):
+            continue
+        v, at = val.get("v"), val.get("at", "")
+        if v is False and at:
+            try:
+                age = (today - datetime.strptime(at, "%Y-%m-%d").date()).days
+                if age >= VERDICT_FALSE_TTL_DAYS:
+                    continue               # 만료 → 재검토 대상
+            except Exception:
+                pass
+        out[vid] = v
+    return out
 
 
 def save_verdict(vid_id, verdict):
@@ -398,11 +602,20 @@ def save_verdict(vid_id, verdict):
     보류를 저장하면 다음 실행 때 재시도할 기회를 잃는다."""
     if verdict is None or not vid_id:
         return
-    data = load_verdicts()
-    data[vid_id] = bool(verdict)
+
+    raw = {}
+    if os.path.exists(VERDICT_FILE):
+        try:
+            with open(VERDICT_FILE, encoding="utf-8") as f:
+                raw = json.load(f)
+        except Exception:
+            raw = {}
+
+    raw[vid_id] = {"v": bool(verdict),
+                   "at": datetime.now(KST).strftime("%Y-%m-%d")}
     try:
         with open(VERDICT_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=1)
+            json.dump(raw, f, ensure_ascii=False, indent=1)
     except Exception as e:
         print(f"[검증캐시 저장 오류] {e}")
 
@@ -452,7 +665,8 @@ def verify_appearance_with_gemini(title, description):
     return None
 
 
-def matches_keyword(title, snippet_desc, vid_id, desc_is_full=False):
+def matches_keyword(title, snippet_desc, vid_id, desc_is_full=False,
+                    channel_id="", channel_name=""):
     """제목 → 설명란 순으로 키워드를 검사한다.
     반환: (통과 여부, 사유코드)
       title          - 제목에서 발견 (확실)
@@ -482,6 +696,11 @@ def matches_keyword(title, snippet_desc, vid_id, desc_is_full=False):
 
     if not _has_keyword(description):
         return False, "no-keyword"
+
+    # 판정 '이전에' 채널을 후보로 기록한다.
+    # Gemini가 NO를 내도, 판정에 실패해도 채널은 남긴다.
+    # 여기서 기록하지 않으면 놓친 채널을 알게 될 방법이 없다.
+    note_candidate_channel(channel_id, channel_name, vid_id)
 
     # 설명란에만 이름이 있는 애매한 경우 → 출연 여부 검증
     verdict = verify_appearance_with_gemini(title, description)
@@ -528,50 +747,41 @@ def log_rejection(reason, title, vid_id, channel=""):
         print(f"[거부 로그 저장 오류] {e}")
 
 
-def get_duration(vid_id):
+def get_duration_info(vid_id):
+    """영상 길이를 (초, 표시문자열)로 한 번에 반환. 실패 시 (-1, '알 수 없음').
+
+    예전에는 get_duration과 get_duration_seconds가 같은 영상에 대해
+    videos.list를 각각 호출해 쿼터를 두 배로 썼다. 하나로 합쳤다.
+    timeout과 try/except가 없어 여기서 터지면 실행 전체가 죽던 문제도 함께 고친다.
+    """
     url = "https://www.googleapis.com/youtube/v3/videos"
-    params = {
-        "part": "contentDetails",
-        "id": vid_id,
-        "key": YOUTUBE_API_KEY,
-    }
-    res = requests.get(url, params=params)
-    usage_tracker.youtube("videos.list", 1, video=vid_id)
-    items = res.json().get("items", [])
+    params = {"part": "contentDetails", "id": vid_id, "key": YOUTUBE_API_KEY}
+    try:
+        res = requests.get(url, params=params, timeout=30)
+        usage_tracker.youtube("videos.list", 1, video=vid_id)
+        items = res.json().get("items", [])
+    except Exception as e:
+        print(f"[길이 조회 오류] {vid_id}: {type(e).__name__}")
+        return -1, "알 수 없음"
+
     if not items:
-        return "알 수 없음"
-    duration = items[0]["contentDetails"]["duration"]
-    match = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", duration)
+        return -1, "알 수 없음"
+
+    match = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?",
+                     items[0]["contentDetails"].get("duration", ""))
     if not match:
-        return "알 수 없음"
+        return -1, "알 수 없음"
+
     hours   = int(match.group(1) or 0)
     minutes = int(match.group(2) or 0)
     seconds = int(match.group(3) or 0)
+    total = hours * 3600 + minutes * 60 + seconds
+
     if hours > 0:
-        return f"{hours}시간 {minutes:02d}분 {seconds:02d}초"
-    elif minutes > 0:
-        return f"{minutes}분 {seconds:02d}초"
-    else:
-        return f"{seconds}초"
-
-
-def get_duration_seconds(vid_id):
-    """영상 길이를 초 단위 정수로 반환 (길이 필터용). 실패 시 -1."""
-    url = "https://www.googleapis.com/youtube/v3/videos"
-    params = {"part": "contentDetails", "id": vid_id, "key": YOUTUBE_API_KEY}
-    res = requests.get(url, params=params)
-    usage_tracker.youtube("videos.list", 1, video=vid_id)
-    items = res.json().get("items", [])
-    if not items:
-        return -1
-    duration = items[0]["contentDetails"]["duration"]
-    match = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", duration)
-    if not match:
-        return -1
-    h = int(match.group(1) or 0)
-    m = int(match.group(2) or 0)
-    s = int(match.group(3) or 0)
-    return h * 3600 + m * 60 + s
+        return total, f"{hours}시간 {minutes:02d}분 {seconds:02d}초"
+    if minutes > 0:
+        return total, f"{minutes}분 {seconds:02d}초"
+    return total, f"{seconds}초"
 
 
 # ────────────────────────────────────────────────
@@ -904,39 +1114,46 @@ def audit_missed():
         datetime.now(timezone.utc) - timedelta(days=AUDIT_LOOKBACK_DAYS)
     ).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    candidates, page_token = [], None
-    for page in range(2):
-        params = {
-            "part": "snippet",
-            "q": KEYWORD,
-            "type": "video",
-            "order": "relevance",     # 본 수집(date)과 다른 정렬 → 다른 결과 집합
-            "maxResults": 50,
-            "publishedAfter": published_after,
-            "key": YOUTUBE_API_KEY,
-        }
-        if page_token:
-            params["pageToken"] = page_token
-        try:
-            data = requests.get(url, params=params, timeout=30).json()
-            usage_tracker.youtube("search.list", 100, note="audit")
-        except Exception as e:
-            print(f"[점검 오류] {e}")
-            break
-        if "error" in data:
-            print(f"[점검 API 오류] {data['error'].get('message', '')[:80]}")
-            break
+    # 본 수집과 다른 각도로 훑기 위해 쿼리와 정렬을 모두 바꾼다.
+    # 같은 조건으로 다시 돌리면 같은 사각지대를 반복할 뿐이다.
+    audit_queries = [("이선엽", "relevance"), ("AFW파트너스", "relevance")]
+    candidates, found = [], set()
 
-        for it in data.get("items", []):
-            vid = it["id"].get("videoId")
-            if not vid or vid in seen:
-                continue
-            title = html.unescape(it["snippet"]["title"])
-            candidates.append((vid, title, it["snippet"]["channelTitle"]))
+    for query, order in audit_queries:
+        page_token = None
+        for page in range(2):
+            params = {
+                "part": "snippet",
+                "q": query,
+                "type": "video",
+                "order": order,
+                "maxResults": 50,
+                "publishedAfter": published_after,
+                "key": YOUTUBE_API_KEY,
+            }
+            if page_token:
+                params["pageToken"] = page_token
+            try:
+                data = requests.get(url, params=params, timeout=30).json()
+                usage_tracker.youtube("search.list", 100, note=f"audit:{query}")
+            except Exception as e:
+                print(f"[점검 오류] {type(e).__name__}")
+                break
+            if "error" in data:
+                print(f"[점검 API 오류] {data['error'].get('message', '')[:80]}")
+                break
 
-        page_token = data.get("nextPageToken")
-        if not page_token:
-            break
+            for it in data.get("items", []):
+                vid = it["id"].get("videoId")
+                if not vid or vid in seen or vid in found:
+                    continue
+                found.add(vid)
+                title = html.unescape(it["snippet"]["title"])
+                candidates.append((vid, title, it["snippet"]["channelTitle"]))
+
+            page_token = data.get("nextPageToken")
+            if not page_token:
+                break
 
     mark_audit_done()
 
@@ -1094,151 +1311,225 @@ def update_perspective(new_items):
     return updated
 
 
+class RunStats:
+    """한 번의 실행에서 일어난 일을 모은다.
+
+    예전에는 카운터 몇 개만 있어서 '무엇이' 걸러졌는지 알 수 없었다.
+    알림봇에서 가장 위험한 상태는 놓치는 것이 아니라 놓친 줄 모르는 것이므로,
+    제목과 링크까지 보관해 실행 요약에 실을 수 있게 한다.
+    """
+
+    def __init__(self):
+        self.new_items = []   # (title, date_str, tags, summary)
+        self.skipped = []     # (reason, title, vid_id)
+        self.pending = []     # (title, vid_id, why)
+        self.errors = []      # (title, vid_id, err)
+
+    @property
+    def new_count(self):
+        return len(self.new_items)
+
+
+def process_video(item, seen, stats):
+    """영상 1건을 처리한다. 예외는 호출자가 잡아 다음 영상으로 넘어간다."""
+    vid_id       = item["id"]["videoId"]
+    # YouTube API는 제목의 특수문자를 &#39; 같은 HTML 엔티티로 반환할 수 있어 디코딩
+    title        = html.unescape(item["snippet"]["title"])
+    channel      = item["snippet"]["channelTitle"]
+    channel_id   = item["snippet"].get("channelId", "")
+    published_at = item["snippet"]["publishedAt"]
+    snippet_desc = item["snippet"].get("description", "")
+    # 채널 순회로 온 항목은 설명란이 이미 전체라 재조회가 필요 없다
+    desc_is_full = item.get("_full_desc", False)
+    url          = f"https://www.youtube.com/watch?v={vid_id}"
+
+    # 이미 본 영상은 API 호출을 아끼기 위해 필터 전에 먼저 거른다
+    if vid_id in seen:
+        print(f"[SKIP] {title}")
+        return
+
+    passed, reason = matches_keyword(
+        title, snippet_desc, vid_id, desc_is_full,
+        channel_id=channel_id, channel_name=channel,
+    )
+    if not passed:
+        if reason == "gemini-pending":
+            # 판정 불가 → 보류. seen에도 캐시에도 남기지 않으므로
+            # 다음 실행에서 자동으로 다시 검증된다.
+            stats.pending.append((title, vid_id, "출연 판정 실패"))
+            print(f"[보류] {title}")
+            return
+
+        print(f"[SKIP-필터:{reason}] {title}")
+        # Gemini가 판단한 애매한 건만 기록 (단순 미포함은 양이 많아 제외)
+        if reason == "gemini-no":
+            stats.skipped.append((reason, title, vid_id))
+            log_rejection(reason, title, vid_id, channel)
+        return
+
+    # 출연이 확인된 시점에 바로 학습한다.
+    # 성공 경로 끝에 두면 길이·자막 필터에 걸릴 때마다 학습 기회를 잃는다.
+    learn_channel(channel_id, channel)
+
+    # 길이 조회는 videos.list 1회. 초와 표시문자열을 함께 받는다.
+    dur_sec, duration_str = get_duration_info(vid_id)
+
+    # 10분 미만 영상(숏폼 등)은 요약하지 않고 건너뜀
+    if 0 <= dur_sec < MIN_DURATION_SEC:
+        print(f"[SKIP-길이] {title} ({dur_sec}초 < 10분)")
+        stats.skipped.append(("short", title, vid_id))
+        log_rejection("short", title, vid_id, channel)
+        if NOTIFY_SKIPS:
+            send_telegram(
+                f"⏭ *짧은 영상 건너뜀* ({dur_sec // 60}분 {dur_sec % 60}초)\n"
+                f"{title}\n{channel}\n{url}"
+            )
+        save_seen_id(vid_id)  # 다음 실행 때 또 안 걸리게 기록
+        return
+
+    date_str = format_date(published_at)
+
+    transcript, fail_reason = get_transcript(vid_id)
+    # 자막 없으면 요약/아카이브 안 함 (자막 있는 것만)
+    if not transcript:
+        tries = bump_transcript_retry(vid_id)
+        if tries < TRANSCRIPT_MAX_RETRIES:
+            # 아직 자동 자막이 안 붙었을 수 있다.
+            # seen에 넣지 않으므로 다음 실행에서 자동으로 재시도된다.
+            stats.pending.append(
+                (title, vid_id, f"자막 대기 {tries}/{TRANSCRIPT_MAX_RETRIES}")
+            )
+            print(f"[자막대기] {title} "
+                  f"({tries}/{TRANSCRIPT_MAX_RETRIES}) {fail_reason}")
+            return
+
+        # 재시도 소진 → 포기. 이때는 조용히 버리지 않고 반드시 알린다.
+        print(f"[SKIP-자막없음] {title} ({fail_reason})")
+        stats.skipped.append(("no-transcript", title, vid_id))
+        log_rejection("no-transcript", title, vid_id, channel)
+        send_telegram(
+            f"⏭ *자막 없어 요약 생략* ({TRANSCRIPT_MAX_RETRIES}회 시도)\n"
+            f"{title}\n{channel}\n"
+            f"📅 {date_str}  ⏱ {duration_str}\n{url}"
+        )
+        save_seen_id(vid_id)
+        return
+
+    summary = summarize_with_gemini(title, transcript)
+    tags = extract_topics(title, transcript)
+
+    # 아카이브에 노트 저장 (누적)
+    save_archive(vid_id, title, channel, date_str, duration_str,
+                 summary, transcript, tags, True)
+
+    # 개별 영상 요약 메시지 발송
+    tag_line = " ".join(f"#{t}" for t in tags) if tags else ""
+    send_telegram(
+        f"🎬 *이선엽 대표* 새 영상 · 노트 추가됨\n\n"
+        f"*{title}*\n채널: {channel}\n"
+        f"📅 {date_str}  ⏱ {duration_str}\n{tag_line}\n\n"
+        f"{clip(to_telegram(summary))}\n\n"
+        f"_※ AI 생성 참고 정보이며 투자 조언이 아닙니다._\n{url}"
+    )
+
+    stats.new_items.append((title, date_str, tags, summary))
+    save_seen_id(vid_id)
+    print(f"[NEW] {title}")
+
+
+def build_status_message(stats):
+    """실행 결과 요약 한 덩어리. 조용히 사라지는 항목이 없게 한다."""
+    now = datetime.now(KST).strftime("%Y년 %m월 %d일 %H:%M")
+    lines = []
+
+    if stats.new_count == 0:
+        lines.append(f"✅ 이선엽 대표 새 영상 없음\n({now} 기준)")
+    else:
+        lines.append(f"📌 이번 실행 요약 ({now})\n신규 {stats.new_count}건 발송 완료")
+
+    if stats.pending:
+        lines.append(f"\n⏳ *보류 {len(stats.pending)}건* (다음 실행에서 재시도)")
+        for title, vid, why in stats.pending[:5]:
+            lines.append(f"• {title[:45]} — {why}\n"
+                         f"  https://www.youtube.com/watch?v={vid}")
+        if len(stats.pending) > 5:
+            lines.append(f"…외 {len(stats.pending) - 5}건")
+
+    if stats.skipped:
+        counts = {}
+        for reason, _, _ in stats.skipped:
+            counts[reason] = counts.get(reason, 0) + 1
+        detail = ", ".join(f"{k} {v}건" for k, v in counts.items())
+        lines.append(f"\n🗑 필터 제외: {detail}")
+
+    if stats.errors:
+        lines.append(f"\n🚨 *처리 실패 {len(stats.errors)}건*")
+        for title, vid, err in stats.errors[:5]:
+            lines.append(f"• {title[:45]}\n  `{err[:60]}`\n"
+                         f"  https://www.youtube.com/watch?v={vid}")
+
+    return clip("\n".join(lines))
+
+
 def main():
     seen = get_seen_ids()
     videos = collect_videos()
-    new_count = 0
-    pending_count = 0   # 판정 불가로 보류된 건 (다음 실행에서 재시도)
-    new_items = []  # 이번에 처리한 (title, date_str, tags, summary)
+    stats = RunStats()
 
     for item in videos:
-        vid_id       = item["id"]["videoId"]
-        # YouTube API는 제목의 특수문자를 &#39; 같은 HTML 엔티티로 반환할 수 있어 디코딩
-        title        = html.unescape(item["snippet"]["title"])
-        channel      = item["snippet"]["channelTitle"]
-        channel_id   = item["snippet"].get("channelId", "")
-        published_at = item["snippet"]["publishedAt"]
-        snippet_desc = item["snippet"].get("description", "")
-        # 채널 순회로 온 항목은 설명란이 이미 전체라 재조회가 필요 없다
-        desc_is_full = item.get("_full_desc", False)
+        try:
+            process_video(item, seen, stats)
+        except Exception as e:
+            # 영상 하나가 터져도 나머지는 계속 처리한다.
+            # 예전에는 여기서 예외가 나면 뒤 영상이 전부 유실됐고,
+            # 워크플로는 if: always() 때문에 초록불로 끝나 아무도 몰랐다.
+            vid = item.get("id", {}).get("videoId", "?")
+            title = item.get("snippet", {}).get("title", "?")
+            print(f"[처리 오류] {title[:40]} ({vid}): {type(e).__name__}: {e}")
+            traceback.print_exc()
+            stats.errors.append((title, vid, f"{type(e).__name__}: {e}"))
 
-        # 제목뿐 아니라 설명란(출연자 목록 등)까지 검사.
-        # 이미 본 영상(seen)은 API 호출 아끼기 위해 필터 전에 먼저 거른다.
-        if vid_id in seen:
-            print(f"[SKIP] {title}")
-            continue
-
-        passed, reason = matches_keyword(title, snippet_desc, vid_id, desc_is_full)
-        if not passed:
-            if reason == "gemini-pending":
-                # 판정 불가 → 보류. seen에도 캐시에도 남기지 않으므로
-                # 다음 실행에서 자동으로 다시 검증된다.
-                pending_count += 1
-                print(f"[보류] {title}")
-                continue
-
-            print(f"[SKIP-필터:{reason}] {title}")
-            # Gemini가 판단한 애매한 건만 기록 (단순 미포함은 양이 많아 제외)
-            if reason == "gemini-no":
-                log_rejection(reason, title, vid_id, channel)
-            continue
-
-        # 출연이 확인된 시점에 바로 학습한다.
-        # 성공 경로 끝에 두면 길이·자막 필터에 걸릴 때마다 학습 기회를 잃는다.
-        learn_channel(channel_id, channel)
-
-        # 10분 미만 영상(숏폼 등)은 요약하지 않고 건너뜀
-        dur_sec = get_duration_seconds(vid_id)
-        if 0 <= dur_sec < MIN_DURATION_SEC:
-            print(f"[SKIP-길이] {title} ({dur_sec}초 < 10분)")
-            log_rejection("short", title, vid_id, channel)
-            if NOTIFY_SKIPS:
+    # 신규 영상이 있으면 종합 관점을 별도 메시지 1개로 발송
+    if stats.new_count > 0:
+        try:
+            updated = update_perspective(stats.new_items)
+            if updated:
                 send_telegram(
-                    f"⏭ *짧은 영상 건너뜀* ({dur_sec // 60}분 {dur_sec % 60}초)\n"
-                    f"{title}\n{channel}\n"
-                    f"https://www.youtube.com/watch?v={vid_id}"
+                    f"🧭 *이선엽 관점 종합* (신규 {stats.new_count}건 반영)\n\n"
+                    f"{clip(to_telegram(updated))}\n\n"
+                    f"_※ AI 생성 참고 정보이며 투자 조언이 아닙니다._"
                 )
-            save_seen_id(vid_id)  # 다음 실행 때 또 안 걸리게 기록
-            continue
+                print("[관점 종합 메시지 발송]")
+        except Exception as e:
+            print(f"[관점 종합 실패] {type(e).__name__}: {e}")
+            stats.errors.append(("관점_종합 갱신", "", f"{type(e).__name__}: {e}"))
 
-        date_str     = format_date(published_at)
-        duration_str = get_duration(vid_id)
-
-        transcript, fail_reason = get_transcript(vid_id)
-        # 자막 없으면 요약/아카이브 안 함 (자막 있는 것만)
-        if not transcript:
-            tries = bump_transcript_retry(vid_id)
-            if tries < TRANSCRIPT_MAX_RETRIES:
-                # 아직 자동 자막이 안 붙었을 수 있다.
-                # seen에 넣지 않으므로 다음 실행에서 자동으로 재시도된다.
-                pending_count += 1
-                print(f"[자막대기] {title} "
-                      f"({tries}/{TRANSCRIPT_MAX_RETRIES}) {fail_reason}")
-                continue
-
-            # 재시도 소진 → 포기. 이때는 조용히 버리지 않고 반드시 알린다.
-            print(f"[SKIP-자막없음] {title} ({fail_reason})")
-            log_rejection("no-transcript", title, vid_id, channel)
-            send_telegram(
-                f"⏭ *자막 없어 요약 생략* ({TRANSCRIPT_MAX_RETRIES}회 시도)\n"
-                f"{title}\n{channel}\n"
-                f"📅 {date_str}  ⏱ {duration_str}\n"
-                f"https://www.youtube.com/watch?v={vid_id}"
-            )
-            save_seen_id(vid_id)
-            continue
-
-        summary = summarize_with_gemini(title, transcript)
-        tags = extract_topics(title, transcript)
-
-        # 아카이브에 노트 저장 (누적)
-        save_archive(vid_id, title, channel, date_str, duration_str,
-                     summary, transcript, tags, True)
-
-        # 개별 영상 요약 메시지 발송
-        tag_line = " ".join(f"#{t}" for t in tags) if tags else ""
-        video_msg = (
-            f"🎬 *이선엽 대표* 새 영상 · 노트 추가됨\n\n"
-            f"*{title}*\n채널: {channel}\n"
-            f"📅 {date_str}  ⏱ {duration_str}\n{tag_line}\n\n"
-            f"{clip(to_telegram(summary))}\n\n"
-            f"_※ AI 생성 참고 정보이며 투자 조언이 아닙니다._\n"
-            f"https://www.youtube.com/watch?v={vid_id}"
-        )
-        send_telegram(video_msg)
-
-        new_items.append((title, date_str, tags, summary))
-        save_seen_id(vid_id)
-        new_count += 1
-        print(f"[NEW] {title}")
-
-    # 루프 종료 후: 신규 영상이 있으면 종합 관점을 별도 메시지 1개로 발송
-    if new_count > 0:
-        updated = update_perspective(new_items)
-        if updated:
-            persp_msg = (
-                f"🧭 *이선엽 관점 종합* (신규 {new_count}건 반영)\n\n"
-                f"{clip(to_telegram(updated))}\n\n"
-                f"_※ AI 생성 참고 정보이며 투자 조언이 아닙니다._"
-            )
-            send_telegram(persp_msg)
-            print("[관점 종합 메시지 발송]")
-
-    # 보류가 있으면 조용히 넘어가지 않고 반드시 알린다.
-    # 보류를 숨기면 '놓친 줄 모르는' 상태가 되어 가장 위험하다.
-    pending_note = (
-        f"\n⏳ 보류 {pending_count}건 (판정·자막 대기, 다음 실행에서 재시도)"
-        if pending_count else ""
-    )
-
-    if new_count == 0:
-        now = datetime.now(KST).strftime("%Y년 %m월 %d일 %H:%M")
-        send_telegram(f"✅ 이선엽 대표 새 영상 없음\n({now} 기준){pending_note}")
-        print(f"완료: 신규 영상 없음 (보류 {pending_count}건)")
-    else:
-        if pending_note:
-            send_telegram(f"⏳ *보류 {pending_count}건*\n"
-                          f"출연 판정 실패 또는 자막 미생성으로 이번 실행에서는 미뤘습니다. "
-                          f"다음 실행에서 자동으로 다시 시도합니다.")
-        print(f"완료: 신규 {new_count}건 알림 발송 + 아카이브 저장 "
-              f"(보류 {pending_count}건)")
+    send_telegram(build_status_message(stats))
+    print(f"완료: 신규 {stats.new_count}건 / 보류 {len(stats.pending)}건 / "
+          f"제외 {len(stats.skipped)}건 / 오류 {len(stats.errors)}건")
 
     # 주기적으로 '놓친 영상이 있는지' 스스로 점검한다.
     # 알림봇의 가장 큰 위험은 놓치는 것이 아니라 놓친 줄 모르는 것이다.
-#    if should_run_audit():
-#        print("[놓침 점검] 실행")
-#        audit_missed()
+    try:
+        if should_run_audit():
+            print("[놓침 점검] 실행")
+            audit_missed()
+    except Exception as e:
+        print(f"[놓침 점검 실패] {type(e).__name__}: {e}")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        # 최상위 크래시. 이게 없으면 봇이 죽어도 텔레그램에 아무것도 안 와서
+        # '오늘은 영상이 없었나 보다'로 오해하게 된다.
+        traceback.print_exc()
+        try:
+            send_telegram(
+                f"🚨 *봇 실행 실패*\n`{type(e).__name__}: {str(e)[:200]}`\n\n"
+                f"이번 실행은 중단됐습니다. Actions 로그를 확인하세요."
+            )
+        except Exception:
+            pass
+        raise
