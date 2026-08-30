@@ -7602,3 +7602,383 @@
 {"ts": "2026-08-30T09:13:42Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33303455689", "video": "yXgnW7s-aoQ"}
 {"ts": "2026-08-30T09:13:42Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33303455689", "video": "yR2MFsS12Dk"}
 {"ts": "2026-08-30T09:14:12Z", "provider": "gemini", "action": "call:관점_종합", "units": 5603, "unit": "token", "run": "33303455689", "model": "gemini-3.1-flash-lite", "in_tokens": 4835, "out_tokens": 768}
+{"ts": "2026-08-30T13:10:34Z", "provider": "youtube", "action": "search.list", "units": 100, "unit": "quota", "run": "33313450074", "note": "이선엽:date"}
+{"ts": "2026-08-30T13:10:34Z", "provider": "youtube", "action": "search.list", "units": 100, "unit": "quota", "run": "33313450074", "note": "이선엽:relevance"}
+{"ts": "2026-08-30T13:10:35Z", "provider": "youtube", "action": "search.list", "units": 100, "unit": "quota", "run": "33313450074", "note": "이선엽:relevance"}
+{"ts": "2026-08-30T13:10:35Z", "provider": "youtube", "action": "search.list", "units": 100, "unit": "quota", "run": "33313450074", "note": "AFW파트너스:date"}
+{"ts": "2026-08-30T13:10:35Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:36Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:39Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:43Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:43Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:43Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:44Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:44Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:45Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:45Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:46Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:46Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:46Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:46Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:47Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:47Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:47Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:48Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:48Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:49Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:49Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:49Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:49Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:50Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:52Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:52Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:53Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:53Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:54Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:54Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:55Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:55Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:55Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:55Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:55Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:56Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:57Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:57Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:58Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:59Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:10:59Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:11:00Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:11:00Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:11:01Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:11:02Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:11:02Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:11:03Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:11:03Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:11:03Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:11:03Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:11:04Z", "provider": "youtube", "action": "playlistItems.list", "units": 1, "unit": "quota", "run": "33313450074"}
+{"ts": "2026-08-30T13:11:04Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "hYkCKtAMcoU"}
+{"ts": "2026-08-30T13:11:04Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "G3seI50FlEU"}
+{"ts": "2026-08-30T13:11:05Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "WH9SB-6lmdo"}
+{"ts": "2026-08-30T13:11:05Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "_mbU7TzNDwE"}
+{"ts": "2026-08-30T13:11:05Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "BPmEocYIKmg"}
+{"ts": "2026-08-30T13:11:05Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "pzOg2KeSTko"}
+{"ts": "2026-08-30T13:11:05Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "VX47FKJCg34"}
+{"ts": "2026-08-30T13:11:05Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "4gTjxSXBZcc"}
+{"ts": "2026-08-30T13:11:05Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "6mPeJynosSw"}
+{"ts": "2026-08-30T13:11:05Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "GoOx2tDQLhY"}
+{"ts": "2026-08-30T13:11:05Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "wNje-JuzLPc"}
+{"ts": "2026-08-30T13:11:05Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "tY7sIayflvc"}
+{"ts": "2026-08-30T13:11:06Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "5hUpTX-N6VI"}
+{"ts": "2026-08-30T13:11:06Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "Ny11vmOAk-o"}
+{"ts": "2026-08-30T13:11:06Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "-qBwaiCNJWU"}
+{"ts": "2026-08-30T13:11:06Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "tHb_sat-n_M"}
+{"ts": "2026-08-30T13:11:06Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "vQlZcXqi2zA"}
+{"ts": "2026-08-30T13:11:06Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "e-7bRLYpICQ"}
+{"ts": "2026-08-30T13:11:06Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "Z4StpwdIirc"}
+{"ts": "2026-08-30T13:11:06Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "hDYsJ_1njtY"}
+{"ts": "2026-08-30T13:11:06Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "ExjMayZKjCc"}
+{"ts": "2026-08-30T13:11:07Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "rRU2U5O-YgM"}
+{"ts": "2026-08-30T13:11:07Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "Fkbm0X9jzjs"}
+{"ts": "2026-08-30T13:11:07Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "lmpn1yj_mKk"}
+{"ts": "2026-08-30T13:11:07Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "drb-DRbO9jA"}
+{"ts": "2026-08-30T13:11:07Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "y0cDsAqKSYA"}
+{"ts": "2026-08-30T13:11:07Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "zI9Z9wxDxbs"}
+{"ts": "2026-08-30T13:11:07Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "gO4-FmpEJBU"}
+{"ts": "2026-08-30T13:11:07Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "DU0yLLbiEJw"}
+{"ts": "2026-08-30T13:11:07Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "sFPWVzMLgv8"}
+{"ts": "2026-08-30T13:11:08Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "aMiHmqeJ8_0"}
+{"ts": "2026-08-30T13:11:08Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "Oy5Dlj6SisI"}
+{"ts": "2026-08-30T13:11:08Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "4RVDh26WHW4"}
+{"ts": "2026-08-30T13:11:08Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "MlMfHdCijUg"}
+{"ts": "2026-08-30T13:11:08Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "GIZjcharOQI"}
+{"ts": "2026-08-30T13:11:08Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "jnA9KcPUQAU"}
+{"ts": "2026-08-30T13:11:08Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "o1qn1PWIaHY"}
+{"ts": "2026-08-30T13:11:08Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "yuqptQKcDD0"}
+{"ts": "2026-08-30T13:11:08Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "YC-B-Rj1mXk"}
+{"ts": "2026-08-30T13:11:09Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "UsAWDT39qt8"}
+{"ts": "2026-08-30T13:11:09Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "EjyrPgL3CJw"}
+{"ts": "2026-08-30T13:11:09Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "R1mYRcC1i5A"}
+{"ts": "2026-08-30T13:11:09Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "8X3BlQWk51c"}
+{"ts": "2026-08-30T13:11:09Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "CqNlsRL_p5o"}
+{"ts": "2026-08-30T13:11:09Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "HS6ABYpKgCs"}
+{"ts": "2026-08-30T13:11:09Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "R65SsR34Pbw"}
+{"ts": "2026-08-30T13:11:09Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "JolTVxcJY0U"}
+{"ts": "2026-08-30T13:11:10Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "MpHuIapYyQM"}
+{"ts": "2026-08-30T13:11:10Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "1JRpX58d_CM"}
+{"ts": "2026-08-30T13:11:10Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "T_Oos-dPEUc"}
+{"ts": "2026-08-30T13:11:10Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "DjlY01JaNoU"}
+{"ts": "2026-08-30T13:11:10Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "rfmBksj4RVQ"}
+{"ts": "2026-08-30T13:11:10Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "PHOAj3Rn1Hk"}
+{"ts": "2026-08-30T13:11:10Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "fGTyMNP3fGk"}
+{"ts": "2026-08-30T13:11:10Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "DZFs_eS4McE"}
+{"ts": "2026-08-30T13:11:10Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "c42Hrj--guY"}
+{"ts": "2026-08-30T13:11:11Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "BT5lPwIVbeQ"}
+{"ts": "2026-08-30T13:11:11Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "CvC2Si1K9c8"}
+{"ts": "2026-08-30T13:11:11Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "WV4twypGPlQ"}
+{"ts": "2026-08-30T13:11:11Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "JcUINxj2kZI"}
+{"ts": "2026-08-30T13:11:11Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "Vw5tGUzSXkk"}
+{"ts": "2026-08-30T13:11:11Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "UEEjb9iCBks"}
+{"ts": "2026-08-30T13:11:11Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "kOx6FE4mlGE"}
+{"ts": "2026-08-30T13:11:11Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "i7tChHKa71o"}
+{"ts": "2026-08-30T13:11:11Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "K9mZXPCZC0M"}
+{"ts": "2026-08-30T13:11:11Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "LViRoyKeqzs"}
+{"ts": "2026-08-30T13:11:12Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "Vo_F7qBSiow"}
+{"ts": "2026-08-30T13:11:12Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "lT0QKJ93DJs"}
+{"ts": "2026-08-30T13:11:12Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "1UA44vxvr7o"}
+{"ts": "2026-08-30T13:11:12Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "7dfbDm8Fwa8"}
+{"ts": "2026-08-30T13:11:12Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "QpoV3vTEU6g"}
+{"ts": "2026-08-30T13:11:12Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "CLjHC-M9nlo"}
+{"ts": "2026-08-30T13:11:12Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "qgvpo2bakFQ"}
+{"ts": "2026-08-30T13:11:12Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "qdlDodCZXfI"}
+{"ts": "2026-08-30T13:11:12Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "7y2EKO-MSUA"}
+{"ts": "2026-08-30T13:11:12Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "zU4I1GQm9sg"}
+{"ts": "2026-08-30T13:11:13Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "X7M0QZvLDYQ"}
+{"ts": "2026-08-30T13:11:13Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "V_Wbi5mZ9dA"}
+{"ts": "2026-08-30T13:11:13Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "vlqb4AtMl9U"}
+{"ts": "2026-08-30T13:11:13Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "uM6icxMsmbQ"}
+{"ts": "2026-08-30T13:11:13Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "b2kgyet2W1Q"}
+{"ts": "2026-08-30T13:11:13Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "J1keUAHD-oA"}
+{"ts": "2026-08-30T13:11:13Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "ZJeF2v3Pdd4"}
+{"ts": "2026-08-30T13:11:13Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "RKFILyYBdAk"}
+{"ts": "2026-08-30T13:11:13Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "JLct_Xm1VYg"}
+{"ts": "2026-08-30T13:11:13Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "4XHnOknlIN8"}
+{"ts": "2026-08-30T13:11:14Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "k2FjmzFI2rU"}
+{"ts": "2026-08-30T13:11:14Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "ImoP2GKmJJU"}
+{"ts": "2026-08-30T13:11:14Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "lWS9fyCL6hk"}
+{"ts": "2026-08-30T13:11:14Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "WJjnegPE_7M"}
+{"ts": "2026-08-30T13:11:14Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "fkJrmvBFNVQ"}
+{"ts": "2026-08-30T13:11:14Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "KDokBedvbjA"}
+{"ts": "2026-08-30T13:11:14Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "Ozx07wQSnjk"}
+{"ts": "2026-08-30T13:11:14Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "1J1M0fQY0Ko"}
+{"ts": "2026-08-30T13:11:15Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "fh1HpYzW3yU"}
+{"ts": "2026-08-30T13:11:15Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "2ym3-PAy3rU"}
+{"ts": "2026-08-30T13:11:15Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "2cXgukUowTo"}
+{"ts": "2026-08-30T13:11:15Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "XLvcsDEZoxc"}
+{"ts": "2026-08-30T13:11:15Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "yxqTpr4uG5k"}
+{"ts": "2026-08-30T13:11:15Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "maoOgB8LZyA"}
+{"ts": "2026-08-30T13:11:15Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "RizlCHP5FhM"}
+{"ts": "2026-08-30T13:11:15Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "odFRwfXPSKk"}
+{"ts": "2026-08-30T13:11:15Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "921QaLSHplc"}
+{"ts": "2026-08-30T13:11:15Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "OfKhVOXHuSI"}
+{"ts": "2026-08-30T13:11:16Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "N5lqnpT8ksM"}
+{"ts": "2026-08-30T13:11:16Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "GMGBAmBQ_ow"}
+{"ts": "2026-08-30T13:11:16Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "PfwpaMG-vH4"}
+{"ts": "2026-08-30T13:11:16Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "OXMBqyuWSy8"}
+{"ts": "2026-08-30T13:11:16Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "kfRMnjpvGcw"}
+{"ts": "2026-08-30T13:11:16Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "PDjI343ncKU"}
+{"ts": "2026-08-30T13:11:16Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "CLrBRQcetbw"}
+{"ts": "2026-08-30T13:11:16Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "6YxDWqO5B_c"}
+{"ts": "2026-08-30T13:11:16Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "5uCJOA7UC1w"}
+{"ts": "2026-08-30T13:11:17Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "BPc1dDZoYlU"}
+{"ts": "2026-08-30T13:11:17Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "-XhUdT95euo"}
+{"ts": "2026-08-30T13:11:17Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "orrY634C0KE"}
+{"ts": "2026-08-30T13:11:17Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "oVU81fj8jpc"}
+{"ts": "2026-08-30T13:11:17Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "pos6DolHfQU"}
+{"ts": "2026-08-30T13:11:17Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "JL7CPQ8u6FA"}
+{"ts": "2026-08-30T13:11:17Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "qI1KeRCXSu0"}
+{"ts": "2026-08-30T13:11:17Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "3oJVFo3HLRk"}
+{"ts": "2026-08-30T13:11:17Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "niTswluLCdg"}
+{"ts": "2026-08-30T13:11:17Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "QDxCvUXpfkk"}
+{"ts": "2026-08-30T13:11:18Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "ioXh4fvRA3Y"}
+{"ts": "2026-08-30T13:11:18Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "DkN3Ai_YO7o"}
+{"ts": "2026-08-30T13:11:18Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "qFgc75h3uUw"}
+{"ts": "2026-08-30T13:11:18Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "3IJL0ixT8DY"}
+{"ts": "2026-08-30T13:11:18Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "DyoGo7B9vzU"}
+{"ts": "2026-08-30T13:11:18Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "xrCZWm5zSK4"}
+{"ts": "2026-08-30T13:11:18Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "WfFKD9SYA7w"}
+{"ts": "2026-08-30T13:11:18Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "8-fVf7pcJhc"}
+{"ts": "2026-08-30T13:11:18Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "7c3xtxW9P3M"}
+{"ts": "2026-08-30T13:11:18Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "Pxzc3OTaZCU"}
+{"ts": "2026-08-30T13:11:19Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "TE3VnZA8PAQ"}
+{"ts": "2026-08-30T13:11:19Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "hAkuSrCt1H8"}
+{"ts": "2026-08-30T13:11:19Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "RLnndrzzdog"}
+{"ts": "2026-08-30T13:11:19Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "MiE8KF4CK5g"}
+{"ts": "2026-08-30T13:11:19Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "81VrafTWWiw"}
+{"ts": "2026-08-30T13:11:19Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "XZ2exo57DTo"}
+{"ts": "2026-08-30T13:11:19Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "29o6jL3DkMY"}
+{"ts": "2026-08-30T13:11:19Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "x2mvyBiDiKY"}
+{"ts": "2026-08-30T13:11:19Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "vHK2N9o8Nqc"}
+{"ts": "2026-08-30T13:11:20Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "fW6GFycdVFs"}
+{"ts": "2026-08-30T13:11:20Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "5ykHPB-GkKs"}
+{"ts": "2026-08-30T13:11:20Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "5XHGDlD1onc"}
+{"ts": "2026-08-30T13:11:20Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "tVf0ZcaLjqM"}
+{"ts": "2026-08-30T13:11:20Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "m0TEtCg62Xw"}
+{"ts": "2026-08-30T13:11:20Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "UsAibtcSFHc"}
+{"ts": "2026-08-30T13:11:20Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "jfvix9PB27A"}
+{"ts": "2026-08-30T13:11:20Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "MbN414aoW-M"}
+{"ts": "2026-08-30T13:11:21Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "aWHnJEzYxYQ"}
+{"ts": "2026-08-30T13:11:21Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "6FQTr_pIscE"}
+{"ts": "2026-08-30T13:11:21Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "q6Xby29OQjY"}
+{"ts": "2026-08-30T13:11:21Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "SVPnjKAcmkk"}
+{"ts": "2026-08-30T13:11:21Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "4zcI_8YHWlg"}
+{"ts": "2026-08-30T13:11:21Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "wGa_WeYL4bE"}
+{"ts": "2026-08-30T13:11:21Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "8-WeQRvq5Vk"}
+{"ts": "2026-08-30T13:11:21Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "BEXJAZWpg9g"}
+{"ts": "2026-08-30T13:11:21Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "N4PwZBw4Fis"}
+{"ts": "2026-08-30T13:11:21Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "sZh3JN_v5bg"}
+{"ts": "2026-08-30T13:11:22Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "36R_t5zO154"}
+{"ts": "2026-08-30T13:11:22Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "usH-1oyAocU"}
+{"ts": "2026-08-30T13:11:22Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "H90mb31nXNg"}
+{"ts": "2026-08-30T13:11:22Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "mfsi9aP6jNo"}
+{"ts": "2026-08-30T13:11:22Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "5GXAlWXzcdU"}
+{"ts": "2026-08-30T13:11:22Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "x8VXxgs6m7E"}
+{"ts": "2026-08-30T13:11:22Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "PYxiqFzQgrA"}
+{"ts": "2026-08-30T13:11:22Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "hkavqJFa85Y"}
+{"ts": "2026-08-30T13:11:22Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "LQ3wt8mlbRY"}
+{"ts": "2026-08-30T13:11:23Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "hycxhaYE3HY"}
+{"ts": "2026-08-30T13:11:23Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "gJIvNulncck"}
+{"ts": "2026-08-30T13:11:23Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "8V30RIf6v3A"}
+{"ts": "2026-08-30T13:11:23Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "bm7Jpo4LI2Y"}
+{"ts": "2026-08-30T13:11:23Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "NY4EYb0iXC0"}
+{"ts": "2026-08-30T13:11:23Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "tUJyGJVNot4"}
+{"ts": "2026-08-30T13:11:23Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "XrUOofbADSM"}
+{"ts": "2026-08-30T13:11:23Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "MsAc3ft-3S8"}
+{"ts": "2026-08-30T13:11:23Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "JgIPulHdtJY"}
+{"ts": "2026-08-30T13:11:23Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "M5_zkW-lTYw"}
+{"ts": "2026-08-30T13:11:24Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "Jp31rWGpRbA"}
+{"ts": "2026-08-30T13:11:24Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "MbPcWxxoC-0"}
+{"ts": "2026-08-30T13:11:24Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "tlVHzJxs8Ik"}
+{"ts": "2026-08-30T13:11:24Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "ozML6eVRD4k"}
+{"ts": "2026-08-30T13:11:24Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "ZqAKpNlSXgM"}
+{"ts": "2026-08-30T13:11:24Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "RFHAk0s6eFc"}
+{"ts": "2026-08-30T13:11:24Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "F4kqemIrXUY"}
+{"ts": "2026-08-30T13:11:24Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "dtHv2eihAdk"}
+{"ts": "2026-08-30T13:11:24Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "AZE0r9VQ3kM"}
+{"ts": "2026-08-30T13:11:24Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "XgwCcJ4GesE"}
+{"ts": "2026-08-30T13:11:25Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "-WYV9cW6E0E"}
+{"ts": "2026-08-30T13:11:25Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "WAHhjIkihHs"}
+{"ts": "2026-08-30T13:11:25Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "eYwtOEzng0Y"}
+{"ts": "2026-08-30T13:11:25Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "PpbX8wmLe6Y"}
+{"ts": "2026-08-30T13:11:25Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "HyxP6ud9RTo"}
+{"ts": "2026-08-30T13:11:25Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "LKaadrym9Ys"}
+{"ts": "2026-08-30T13:11:25Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "zT9xR0RDv7A"}
+{"ts": "2026-08-30T13:11:25Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "31VD_jJCh9k"}
+{"ts": "2026-08-30T13:11:25Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "Q6FEfcj-p2c"}
+{"ts": "2026-08-30T13:11:25Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "JecX_GwutBY"}
+{"ts": "2026-08-30T13:11:26Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "iF4zWsyrdrI"}
+{"ts": "2026-08-30T13:11:26Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "vjVjzIb07UQ"}
+{"ts": "2026-08-30T13:11:26Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "YhHU8DuSK-I"}
+{"ts": "2026-08-30T13:11:26Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "qnR7r4sxQv4"}
+{"ts": "2026-08-30T13:11:26Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "AQKmw3Z0WZk"}
+{"ts": "2026-08-30T13:11:26Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "AxZrk5pQq_I"}
+{"ts": "2026-08-30T13:11:26Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "qH0Sh7lBaOY"}
+{"ts": "2026-08-30T13:11:26Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "B5yx9xsbuDw"}
+{"ts": "2026-08-30T13:11:27Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "b-DttnkyIQk"}
+{"ts": "2026-08-30T13:11:27Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "5Iz3AtaXYuo"}
+{"ts": "2026-08-30T13:11:27Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "a9Clonx-8tA"}
+{"ts": "2026-08-30T13:11:27Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "2s8nT2WpEBU"}
+{"ts": "2026-08-30T13:11:27Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "fXdeLryFjWk"}
+{"ts": "2026-08-30T13:11:27Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "k-8-LLMmuGQ"}
+{"ts": "2026-08-30T13:11:27Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "W7CWn3a8O5E"}
+{"ts": "2026-08-30T13:11:27Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "LsQj6KyVNac"}
+{"ts": "2026-08-30T13:11:27Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "9oKYiRnSqOI"}
+{"ts": "2026-08-30T13:11:27Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "j0TEC5n1OHY"}
+{"ts": "2026-08-30T13:11:28Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "DNroW88hllU"}
+{"ts": "2026-08-30T13:11:28Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "iRbWDjVNjdw"}
+{"ts": "2026-08-30T13:11:28Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "0RlKKUG-KOo"}
+{"ts": "2026-08-30T13:11:28Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "6hmb--P-0no"}
+{"ts": "2026-08-30T13:11:28Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "ujmbmTlPL-I"}
+{"ts": "2026-08-30T13:11:28Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "IVq7cE3OnFQ"}
+{"ts": "2026-08-30T13:11:28Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "d8Ct68mwDS8"}
+{"ts": "2026-08-30T13:11:28Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "ZmSBDg2NAP0"}
+{"ts": "2026-08-30T13:11:28Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "O7neuzcS_tE"}
+{"ts": "2026-08-30T13:11:29Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "k3V70MyIVYY"}
+{"ts": "2026-08-30T13:11:29Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "ti2EThxaDz4"}
+{"ts": "2026-08-30T13:11:29Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "oDnLBfWiRKg"}
+{"ts": "2026-08-30T13:11:29Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "HmHtbccsWeY"}
+{"ts": "2026-08-30T13:11:29Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "HK7DxFcOjCI"}
+{"ts": "2026-08-30T13:11:29Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "OGELNjrBTzQ"}
+{"ts": "2026-08-30T13:11:29Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "NkGp70uBrhc"}
+{"ts": "2026-08-30T13:11:29Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "X_34sd80H28"}
+{"ts": "2026-08-30T13:11:29Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "mqbJrOgE4Z8"}
+{"ts": "2026-08-30T13:11:29Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "ZchUSytQ7ZY"}
+{"ts": "2026-08-30T13:11:29Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "CTzp866R0_k"}
+{"ts": "2026-08-30T13:11:30Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "E2v9YSfvTE8"}
+{"ts": "2026-08-30T13:11:30Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "C0v-IcbrzAI"}
+{"ts": "2026-08-30T13:11:30Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "zDpEzUVmECA"}
+{"ts": "2026-08-30T13:11:30Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "GeCWTZxGVtE"}
+{"ts": "2026-08-30T13:11:30Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "56qgjJvQMIE"}
+{"ts": "2026-08-30T13:11:30Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "BeYoYC-cfgU"}
+{"ts": "2026-08-30T13:11:30Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "lzXpzUwvrwc"}
+{"ts": "2026-08-30T13:11:30Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "9BOo8NP5E-A"}
+{"ts": "2026-08-30T13:11:30Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "zs5ZZBlHhco"}
+{"ts": "2026-08-30T13:11:30Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "8qAMEeRFC1s"}
+{"ts": "2026-08-30T13:11:31Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "a512hUoUHSE"}
+{"ts": "2026-08-30T13:11:31Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "wudu6I68VtA"}
+{"ts": "2026-08-30T13:11:31Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "VoiLs9jEwMw"}
+{"ts": "2026-08-30T13:11:31Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "z8z6BMfr16M"}
+{"ts": "2026-08-30T13:11:31Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "HYCk-9dcZYQ"}
+{"ts": "2026-08-30T13:11:31Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "wehJ0rtsJB4"}
+{"ts": "2026-08-30T13:11:31Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "iX9VmvwOWx8"}
+{"ts": "2026-08-30T13:11:31Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "QkUjwVJa_zw"}
+{"ts": "2026-08-30T13:11:31Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "NVnJqczlGlQ"}
+{"ts": "2026-08-30T13:11:32Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "eocCRd-LIDo"}
+{"ts": "2026-08-30T13:11:32Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "Ss7hepE0KSg"}
+{"ts": "2026-08-30T13:11:32Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "OzHecIINZNU"}
+{"ts": "2026-08-30T13:11:32Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "H3wcmJTpxck"}
+{"ts": "2026-08-30T13:11:32Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "OyJnWYhkwi4"}
+{"ts": "2026-08-30T13:11:32Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "b80NTWxsUCY"}
+{"ts": "2026-08-30T13:11:32Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "utaYD8TDpl8"}
+{"ts": "2026-08-30T13:11:32Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "KIECzWgbrwY"}
+{"ts": "2026-08-30T13:11:32Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "aMypr2__qxo"}
+{"ts": "2026-08-30T13:11:33Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "jWkN2hXi46U"}
+{"ts": "2026-08-30T13:11:33Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "qaHcGXRo5qc"}
+{"ts": "2026-08-30T13:11:33Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "LIwd8x5kWac"}
+{"ts": "2026-08-30T13:11:33Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "2bqrk3BvWO8"}
+{"ts": "2026-08-30T13:11:33Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "a4TajxcFlhs"}
+{"ts": "2026-08-30T13:11:33Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "jah2dxovh6k"}
+{"ts": "2026-08-30T13:11:33Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "9UQJMCIeFQA"}
+{"ts": "2026-08-30T13:11:33Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "sSxGP2RgdZg"}
+{"ts": "2026-08-30T13:11:33Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "6WO35EPAs70"}
+{"ts": "2026-08-30T13:11:33Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "_4jQdDbm5qE"}
+{"ts": "2026-08-30T13:11:34Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "kSU5yV_cB2I"}
+{"ts": "2026-08-30T13:11:34Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "saLNsXkrm74"}
+{"ts": "2026-08-30T13:11:34Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "bRfzKs0LEMs"}
+{"ts": "2026-08-30T13:11:34Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "2Vx1rxgN5u4"}
+{"ts": "2026-08-30T13:11:34Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "ytm4PXTAgFw"}
+{"ts": "2026-08-30T13:11:34Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "9bz_TcD2LVk"}
+{"ts": "2026-08-30T13:11:34Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "wLLPHLe418U"}
+{"ts": "2026-08-30T13:11:34Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "hQ_YC9y85lM"}
+{"ts": "2026-08-30T13:11:34Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "8HV4U0AM8t0"}
+{"ts": "2026-08-30T13:11:35Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "2MKPCk_eO3k"}
+{"ts": "2026-08-30T13:11:35Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "w3gojNXNrUs"}
+{"ts": "2026-08-30T13:11:35Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "_dHLfMjrwco"}
+{"ts": "2026-08-30T13:11:35Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "m-oYvm5nhE8"}
+{"ts": "2026-08-30T13:11:35Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "vp705XiVk-s"}
+{"ts": "2026-08-30T13:11:35Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "zaO96wGol6k"}
+{"ts": "2026-08-30T13:11:35Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "8CmgyAWhj3Q"}
+{"ts": "2026-08-30T13:11:35Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "bH3jCIbbd-E"}
+{"ts": "2026-08-30T13:11:35Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "5awf65tXCeI"}
+{"ts": "2026-08-30T13:11:35Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "ax57Ov6711g"}
+{"ts": "2026-08-30T13:11:36Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "evv4PL1bBXA"}
+{"ts": "2026-08-30T13:11:36Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "mXwxrfV2U24"}
+{"ts": "2026-08-30T13:11:36Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "tgKklA0kXCY"}
+{"ts": "2026-08-30T13:11:36Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "gNYIlK-oaIA"}
+{"ts": "2026-08-30T13:11:36Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "zcDhePRv2_I"}
+{"ts": "2026-08-30T13:11:36Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "EkTWj6vOyb4"}
+{"ts": "2026-08-30T13:11:36Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "CIJ69Kj_oJo"}
+{"ts": "2026-08-30T13:11:36Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "os4lhQps5Is"}
+{"ts": "2026-08-30T13:11:40Z", "provider": "supadata", "action": "transcript", "units": 1.0, "unit": "credit", "run": "33313450074", "video": "os4lhQps5Is", "mode": "auto", "status": 200}
+{"ts": "2026-08-30T13:11:46Z", "provider": "gemini", "action": "call:요약", "units": 9325, "unit": "token", "run": "33313450074", "model": "gemini-3.1-flash-lite", "in_tokens": 8392, "out_tokens": 933}
+{"ts": "2026-08-30T13:11:47Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "-2jJeQ5dPnU"}
+{"ts": "2026-08-30T13:11:47Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "WZd2XXbgsCw"}
+{"ts": "2026-08-30T13:11:48Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "jc1K59vGWvw"}
+{"ts": "2026-08-30T13:11:48Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "FBZSrI0yGtU"}
+{"ts": "2026-08-30T13:11:48Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "fkb5JH1ovEY"}
+{"ts": "2026-08-30T13:11:48Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "s0hSZ8qgNYc"}
+{"ts": "2026-08-30T13:11:48Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "cm_-HnzIdxU"}
+{"ts": "2026-08-30T13:11:48Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "8J1sQAl28O0"}
+{"ts": "2026-08-30T13:11:48Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "PXYAIsYyR1c"}
+{"ts": "2026-08-30T13:11:48Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "7InCQz-K064"}
+{"ts": "2026-08-30T13:11:49Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "cyTbW9KS_XA"}
+{"ts": "2026-08-30T13:11:49Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "apKoh7IE1Ko"}
+{"ts": "2026-08-30T13:11:49Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "GZnseR2-gXc"}
+{"ts": "2026-08-30T13:11:49Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "Wg6F6cPuRYg"}
+{"ts": "2026-08-30T13:11:49Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "Rf0uWpiQdjo"}
+{"ts": "2026-08-30T13:11:49Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "E15v_POp3-U"}
+{"ts": "2026-08-30T13:11:49Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "0Pz2j0BKJj8"}
+{"ts": "2026-08-30T13:11:49Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "JVA_hUl29SI"}
+{"ts": "2026-08-30T13:11:49Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "yXgnW7s-aoQ"}
+{"ts": "2026-08-30T13:11:49Z", "provider": "youtube", "action": "videos.list", "units": 1, "unit": "quota", "run": "33313450074", "video": "yR2MFsS12Dk"}
+{"ts": "2026-08-30T13:11:53Z", "provider": "gemini", "action": "call:관점_종합", "units": 3422, "unit": "token", "run": "33313450074", "model": "gemini-3.1-flash-lite", "in_tokens": 2670, "out_tokens": 752}
