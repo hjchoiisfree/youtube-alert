@@ -1046,4 +1046,587 @@ def save_archive(vid_id, title, channel, date_str, duration_str,
         lines.append(transcript[:MAX_ARCHIVE_TRANSCRIPT])
         if len(transcript) > MAX_ARCHIVE_TRANSCRIPT:
             lines.append("\n...(이하 생략)...")
-        lines.append("
+        lines.append("```")
+    else:
+        lines.append("_자막을 가져오지 못했습니다._")
+    lines += ["", "</details>", ""]
+
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+    print(f"[아카이브 저장] {path}")
+    return path
+
+
+# ────────────────────────────────────────────────
+
+def format_date(published_at):
+    """발행 시각을 KST로 표시한다.
+
+    '17:00' 형태로 쓰면 안 된다. 텔레그램은 메시지에 유튜브 링크가 있을 때
+    본문의 HH:MM 패턴을 영상 타임스탬프 링크로 자동 변환한다.
+    그래서 발행 시각이 '17분 지점으로 이동' 링크로 둔갑 단다.
+    콜론을 쓰지 않으면 이 자동 변환이 걸리지 않는다.
+    """
+    dt = datetime.strptime(published_at, "%Y-%m-%dT%H:%M:%SZ")
+    dt = dt.replace(tzinfo=timezone.utc)
+    kst = dt.astimezone(KST)
+    return kst.strftime("%Y년 %m월 %d일 %H시 %M분")
+
+
+def to_telegram(md):
+    """마크다운을 텔레그램 레거시 Markdown이 이해하는 형태로 변환.
+    텔레그램은 ##/### 헤더와 **볼드**를 지원하지 않는다(후자는 파싱 오류 유발)."""
+    if not md:
+        return md
+    out = []
+    for line in md.split("\n"):
+        s = line.strip()
+        if s.startswith("#"):                       # ### 제목 → *제목*
+            t = s.lstrip("#").strip()
+            out.append(f"*{t}*" if t else "")
+            continue
+        if set(s) <= {"-", "─", "=", "*", "_"} and len(s) >= 3:  # --- → 구분선
+            out.append("➖ ➖ ➖ ➖ ➖")             # 💡 텔레그램용 깔끔한 구분선
+            continue
+        line = re.sub(r"\*\*(.+?)\*\*", r"*\1*", line)  # **볼드** → *볼드*
+        out.append(line)
+    text = "\n".join(out)
+    text = re.sub(r"\n{3,}", "\n\n", text)          # 빈 줄 3개 이상 압축
+    return text.strip()
+
+
+def clip(text, limit=3800):
+    """텔레그램 길이 제한에 맞춰 자르되, 문장/줄 중간에서 끊지 않는다."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    nl = cut.rfind("\n")
+    if nl > limit * 0.7:
+        cut = cut[:nl]
+    return cut.rstrip() + "\n\n…(이하 생략)"
+
+
+def send_telegram(text):
+    """Markdown으로 시도하고, 파싱 오류가 나면 서식 없이 재전송한다.
+    (서식 하나 깨졌다고 알림 자체를 놓치는 일을 막기 위함)"""
+    api = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    try:
+        res = requests.post(
+            api,
+            json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "Markdown"},
+            timeout=30,
+        )
+        if res.status_code == 200:
+            return True
+        print(f"[텔레그램 오류 {res.status_code}] {res.text[:120]} → 평문 재시도")
+    except Exception as e:
+        print(f"[텔레그램 요청 오류] {e} → 평문 재시도")
+
+    try:
+        res = requests.post(
+            api, json={"chat_id": TELEGRAM_CHAT_ID, "text": text}, timeout=30
+        )
+        return res.status_code == 200
+    except Exception as e:
+        print(f"[텔레그램 재시도 실패] {e}")
+        return False
+
+
+PERSPECTIVE_FILE = "관점_종합.md"
+MIN_DURATION_SEC = 600  # 10분 = 600초
+
+
+# ────────────────────────────────────────────────
+# 놓침 점검 (주기적 감사)
+# ────────────────────────────────────────────────
+
+def should_run_audit():
+    """마지막 점검으로부터 AUDIT_INTERVAL_DAYS 이상 지났는지."""
+    if not os.path.exists(AUDIT_FILE):
+        return True
+    try:
+        with open(AUDIT_FILE, encoding="utf-8") as f:
+            last = datetime.strptime(f.read().strip(), "%Y-%m-%d").date()
+    except Exception:
+        return True
+    return (datetime.now(KST).date() - last).days >= AUDIT_INTERVAL_DAYS
+
+
+def mark_audit_done():
+    try:
+        with open(AUDIT_FILE, "w", encoding="utf-8") as f:
+            f.write(datetime.now(KST).strftime("%Y-%m-%d"))
+    except Exception as e:
+        print(f"[점검일 기록 오류] {e}")
+
+
+def audit_missed():
+    """평소와 '다른 각도'로 검색해 놓친 영상이 있는지 점검한다.
+
+    본 수집은 order=date + 14일이라 관련성 상위권만 훑는다.
+    여기서는 order=relevance + 30일로 돌려 다른 결과 집합을 얻고,
+    그중 seen_ids에 없는 것을 후보로 보고한다.
+    자동 처리하지 않고 사람이 판단하도록 목록만 알린다."""
+    seen = get_seen_ids()
+    # 이미 판정이 끝난 영상은 '놓친 것'이 아니다.
+    # gemini-no로 걸러진 영상은 seen_ids에 들어가지 않으므로(의도된 설계),
+    # seen만 보면 정상적으로 걸러낸 건이 전부 후보로 올라와 노이즈에 묻힌다.
+    judged = set(load_verdicts().keys())
+    url = "https://www.googleapis.com/youtube/v3/search"
+    published_after = (
+        datetime.now(timezone.utc) - timedelta(days=AUDIT_LOOKBACK_DAYS)
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # 본 수집과 다른 각도로 훑기 위해 쿼리와 정렬을 모두 바꾼다.
+    # 같은 조건으로 다시 돌리면 같은 사각지대를 반복할 뿐이다.
+    audit_queries = [("이선엽", "relevance"), ("AFW파트너스", "relevance")]
+    candidates, found = [], set()
+
+    for query, order in audit_queries:
+        page_token = None
+        for page in range(2):
+            params = {
+                "part": "snippet",
+                "q": query,
+                "type": "video",
+                "order": order,
+                "maxResults": 50,
+                "publishedAfter": published_after,
+                "key": YOUTUBE_API_KEY,
+            }
+            if page_token:
+                params["pageToken"] = page_token
+            try:
+                data = requests.get(url, params=params, timeout=30).json()
+                usage_tracker.youtube("search.list", 100, note=f"audit:{query}")
+            except Exception as e:
+                print(f"[점검 오류] {type(e).__name__}")
+                break
+            if "error" in data:
+                print(f"[점검 API 오류] {data['error'].get('message', '')[:80]}")
+                break
+
+            for it in data.get("items", []):
+                vid = it["id"].get("videoId")
+                if not vid or vid in seen or vid in judged or vid in found:
+                    continue
+                found.add(vid)
+                title = html.unescape(it["snippet"]["title"])
+                candidates.append((vid, title, it["snippet"]["channelTitle"]))
+
+            page_token = data.get("nextPageToken")
+            if not page_token:
+                break
+
+    mark_audit_done()
+
+    # 제목에 이름이 있는데도 미처리인 건이 진짜 위험 신호다. 맨 위로 올린다.
+    candidates.sort(key=lambda c: (not _has_keyword(c[1]), c[1]))
+    strong = [c for c in candidates if _has_keyword(c[1])]
+
+    if not candidates:
+        print("[놓침 점검] 후보 없음")
+        send_telegram(
+            f"🔍 *놓침 점검 완료* (최근 {AUDIT_LOOKBACK_DAYS}일)\n"
+            "미처리 후보가 발견되지 않았습니다."
+        )
+        return
+
+    print(f"[놓침 점검] 후보 {len(candidates)}건 (제목 매치 {len(strong)}건)")
+    lines = [
+        f"🔍 *놓침 점검* (최근 {AUDIT_LOOKBACK_DAYS}일)",
+    ]
+    if strong:
+        lines.append(f"⚠️ *제목에 이름이 있는데 미처리: {len(strong)}건* — 확인 필요")
+    else:
+        lines.append(f"제목 매치 미처리 0건. 아래는 판정 이력이 없는 참고 후보 "
+                     f"{len(candidates)}건입니다.")
+    lines.append("")
+
+    for vid, title, ch in candidates[:10]:
+        mark = "⚠️ " if _has_keyword(title) else "• "
+        lines.append(f"{mark}{title[:60]}\n  {ch}\n"
+                     f"  https://www.youtube.com/watch?v={vid}")
+    if len(candidates) > 10:
+        lines.append(f"\n…외 {len(candidates) - 10}건")
+
+    send_telegram(clip("\n".join(lines)))
+
+
+def normalize_dates(text):
+    """LLM이 프롬프트 규칙을 어겨도 날짜 표기를 강제로 통일한다.
+    (26-07-31) → `07.31` / (26-07) → `07월` / (26-01~08) → `01~08월`
+    올해 날짜는 연도 생략, 작년 이전은 'YY.MM' 유지."""
+    if not text:
+        return text
+
+    yy = datetime.now(KST).year % 100  # 26
+
+    def _pick(y, m, d=None):
+        """연도(2자리 int) 기준으로 표기 결정."""
+        if y != yy:                       # 작년 이전 → 연도 유지
+            return f"`{y:02d}.{m:02d}`" if d is None else f"`{y:02d}.{m:02d}.{d:02d}`"
+        return f"`{m:02d}월`" if d is None else f"`{m:02d}.{d:02d}`"
+
+    def _range(mo):
+        y = int(mo.group(1)[-2:])
+        m1, m2 = int(mo.group(2)), int(mo.group(3))
+        head = "" if y == yy else f"{y:02d}년 "
+        return f"`{head}{m1:02d}~{m2:02d}월`"
+
+    out = []
+    for line in text.split("\n"):
+        # 제목 줄(#)은 '2026년 8월' 같은 표기를 유지해야 하므로 건드리지 않는다
+        if line.lstrip().startswith("#"):
+            out.append(line)
+            continue
+
+        # 1) (26-01~08) → `01~08월`
+        line = re.sub(r"\(?\b(\d{2}|\d{4})-(\d{1,2})\s*~\s*(\d{1,2})\)?", _range, line)
+        # 2) (26-07-31) → `07.31`
+        line = re.sub(
+            r"\(?\b(\d{2}|\d{4})-(\d{1,2})-(\d{1,2})\)?",
+            lambda mo: _pick(int(mo.group(1)[-2:]), int(mo.group(2)), int(mo.group(3))),
+            line,
+        )
+        # 3) (26-07) → `07월`   ※ 위 두 패턴이 먼저 소비되므로 남은 것만 매칭
+        line = re.sub(
+            r"\(?\b(\d{2}|\d{4})-(\d{1,2})\)?(?![\d~-])",
+            lambda mo: _pick(int(mo.group(1)[-2:]), int(mo.group(2))),
+            line,
+        )
+        # 4) 백틱 중복 제거 (``07.31`` → `07.31`)
+        line = re.sub(r"`{2,}([^`]+)`{2,}", r"`\1`", line)
+        out.append(line)
+
+    return "\n".join(out)
+
+
+def update_perspective(new_items):
+    """관점_종합.md를 롤링 갱신. new_items는 이번에 새로 처리한
+    영상들의 (title, date_str, tags, summary) 리스트.
+    시장 종합 + 추천 섹터/종목 두 카테고리로 작성. 갱신본 반환."""
+    prev = ""
+    if os.path.exists(PERSPECTIVE_FILE):
+        with open(PERSPECTIVE_FILE, "r", encoding="utf-8") as f:
+            prev = f.read()
+
+    # 이번에 새로 추가된 영상 요약들을 하나로 합침
+    new_block = ""
+    for (title, date_str, tags, summary) in new_items:
+        new_block += (
+            f"\n\n=== 신규 영상: {title} ({date_str}) [{', '.join(tags)}] ===\n{summary}"
+        )
+
+    this_year = datetime.now(KST).year
+
+    prompt = (
+        "당신은 이선엽 대표의 시장 관점을 누적 정리하는 애널리스트입니다.\n"
+        "아래 [기존 종합]에 [이번 신규 영상들]의 내용을 반영해 종합본을 갱신하세요.\n\n"
+        # ── 날짜 표기 규칙 (가장 중요) ──────────────────
+        "■ 날짜 표기 규칙 (반드시 지킬 것)\n"
+        f"- 올해는 {this_year}년입니다. 올해 날짜는 연도를 쓰지 마세요.\n"
+        "- 특정 하루  → `08.01`   (백틱 포함, MM.DD)\n"
+        "- 특정 한 달 → `07월`    (백틱 포함, MM월)\n"
+        "- 여러 달    → `01~08월` (백틱 포함, MM~MM월)\n"
+        f"- 작년 이전만 연도 2자리를 붙입니다 → `{str(this_year - 1)[2:]}.12`\n"
+        "- 날짜는 **항목의 맨 앞**에 두세요. 문장 끝 괄호에 넣지 마세요.\n"
+        "  올바른 예: - `08.01` 미·중 패권 전쟁의 본질\n"
+        "  틀린 예:   - 미·중 패권 전쟁의 본질 (26-08-01)\n"
+        "- `26-07-31`, `(26-01~08)`, `2026-08-01` 같은 옛 형식이 [기존 종합]에 남아 있으면 "
+        "위 규칙대로 **전부 고쳐서** 다시 쓰세요.\n"
+        "- 한 항목에 날짜는 하나만. 제목과 본문에 중복해서 넣지 마세요.\n\n"
+        # ── 배지 ──────────────────────────────────────
+        "■ 배지\n"
+        "- 이번 신규 영상에서 새로 나온 항목은 날짜 앞에 🆕\n"
+        "- 3개월 이상 반복해서 언급된 항목은 날짜 앞에 ⭐\n"
+        "- 배지는 섹터 항목에만 붙입니다. 둘 다 해당하면 🆕만 씁니다.\n\n"
+        # ── 본문 구조 ─────────────────────────────────
+        "■ 본문 구조 (아래 순서와 형식을 그대로 지킬 것)\n\n"
+        "💡 *한 줄 요약*\n"
+        "지금 시장에서 가장 중요한 판단 한 문장. 40자 이내. 맨 위에 둡니다.\n\n"
+        "---\n\n"
+        "🆕 *이번에 추가된 관점*\n"
+        "- [이번 신규 영상들]에서 처음 나온 내용만. 최대 3개.\n"
+        "- 형식: `날짜` *제목* → 줄바꿈 → 설명 한 줄(60자 이내)\n"
+        "- 신규 내용이 없으면 이 섹션 전체를 생략하세요.\n\n"
+        "---\n\n"
+        "📊 *시장 관점*\n"
+        "- 누적된 시장 판단. **한 항목당 반드시 한 줄.**\n"
+        "- 형식: `날짜` *제목* — 요약 (전체 50자 이내, 줄바꿈 없이)\n"
+        "- 최신순 정렬. 최대 5개. 넘치면 오래된 것부터 버립니다.\n\n"
+        "---\n\n"
+        "🎯 *주목 섹터*\n"
+        "- 형식: `날짜` *섹터명* — 근거 (전체 50자 이내, 줄바꿈 없이)\n"
+        "- 3개월 이상 반복 언급된 섹터는 맨 앞에 ⭐, 이번 신규는 🆕를 붙입니다.\n"
+        "- '언급 맥락' 같은 라벨은 쓰지 마세요. 날짜 뒤에 바로 내용을 씁니다.\n"
+        "- 이선엽은 개별 종목 추천을 하지 않습니다. 그가 이름을 언급한 종목이 있으면 "
+        "'추천'이 아니라 '언급된 맥락' 그대로만 기록하세요. 매수 신호처럼 각색 금지.\n"
+        "- 최대 6개.\n\n"
+        "■ 그 밖의 규칙\n"
+        "- 섹션 사이에는 --- 한 줄만 넣으세요.\n"
+        "- ## 같은 마크다운 헤더는 쓰지 마세요. 위에 지정한 *굵게* 표기만 씁니다.\n"
+        "- 같은 주제가 반복되면 최신 내용으로 덮어쓰되 날짜 범위를 늘려 흐름을 보존하세요.\n"
+        "- 전체 길이는 공백 포함 1800자를 넘기지 마세요. 넘치면 오래된 항목부터 버립니다.\n\n"
+        f"[기존 종합]\n{prev if prev else '(아직 없음 - 처음부터 작성)'}\n"
+        f"\n[이번 신규 영상들]{new_block}"
+    )
+    updated, err = call_gemini(prompt, tag="관점_종합", timeout=120)
+    if err or not updated:
+        print(f"[관점_종합 갱신 실패] {err} → 기존 파일 유지")
+        return None
+
+    # 모델이 규칙을 어겼을 경우를 대비한 강제 정규화
+    updated = normalize_dates(updated)
+
+    with open(PERSPECTIVE_FILE, "w", encoding="utf-8") as f:
+        f.write(updated)
+    print("[관점_종합 갱신 완료]")
+    return updated
+
+
+class RunStats:
+    """한 번의 실행에서 일어난 일을 모은다.
+
+    예전에는 카운터 몇 개만 있어서 '무엇이' 걸러졌는지 알 수 없었다.
+    알림봇에서 가장 위험한 상태는 놓치는 것이 아니라 놓친 줄 모르는 것이므로,
+    제목과 링크까지 보관해 실행 요약에 실을 수 있게 한다.
+    """
+
+    def __init__(self):
+        self.new_items = []   # (title, date_str, tags, summary)
+        self.skipped = []     # (reason, title, vid_id)
+        self.pending = []     # (title, vid_id, why)
+        self.errors = []      # (title, vid_id, err)
+
+    @property
+    def new_count(self):
+        return len(self.new_items)
+
+
+def process_video(item, seen, stats):
+    """영상 1건을 처리한다. 예외는 호출자가 잡아 다음 영상으로 넘어간다."""
+    vid_id       = item["id"]["videoId"]
+    # YouTube API는 제목의 특수문자를 &#39; 같은 HTML 엔티티로 반환할 수 있어 디코딩
+    title        = html.unescape(item["snippet"]["title"])
+    channel      = item["snippet"]["channelTitle"]
+    channel_id   = item["snippet"].get("channelId", "")
+    published_at = item["snippet"]["publishedAt"]
+    snippet_desc = item["snippet"].get("description", "")
+    # 채널 순회로 온 항목은 설명란이 이미 전체라 재조회가 필요 없다
+    desc_is_full = item.get("_full_desc", False)
+    url          = f"https://www.youtube.com/watch?v={vid_id}"
+
+    # 이미 본 영상은 API 호출을 아끼기 위해 필터 전에 먼저 거른다
+    if vid_id in seen:
+        print(f"[SKIP] {title}")
+        return
+
+    passed, reason = matches_keyword(
+        title, snippet_desc, vid_id, desc_is_full,
+        channel_id=channel_id, channel_name=channel,
+    )
+    if not passed:
+        if reason == "gemini-pending":
+            # 판정 불가 → 보류. seen에도 캐시에도 남기지 않으므로
+            # 다음 실행에서 자동으로 다시 검증된다.
+            stats.pending.append((title, vid_id, "출연 판정 실패"))
+            print(f"[보류] {title}")
+            return
+
+        print(f"[SKIP-필터:{reason}] {title}")
+        # Gemini가 판단한 애매한 건만 기록 (단순 미포함은 양이 많아 제외)
+        if reason == "gemini-no":
+            stats.skipped.append((reason, title, vid_id))
+            log_rejection(reason, title, vid_id, channel)
+        return
+
+    # 출연이 확인된 시점에 바로 학습한다.
+    # 성공 경로 끝에 두면 길이·자막 필터에 걸릴 때마다 학습 기회를 잃는다.
+    learn_channel(channel_id, channel)
+
+    # 길이 조회는 videos.list 1회. 초와 표시문자열을 함께 받는다.
+    dur_sec, duration_str = get_duration_info(vid_id)
+
+    # 10분 미만 영상(숏폼 등)은 요약하지 않고 건너뜀
+    if 0 <= dur_sec < MIN_DURATION_SEC:
+        print(f"[SKIP-길이] {title} ({dur_sec}초 < 10분)")
+        stats.skipped.append(("short", title, vid_id))
+        log_rejection("short", title, vid_id, channel)
+        if NOTIFY_SKIPS:
+            send_telegram(
+                f"⏭ *짧은 영상 건너뜀* ({dur_sec // 60}분 {dur_sec % 60}초)\n"
+                f"{title}\n{channel}\n{url}"
+            )
+        save_seen_id(vid_id)  # 다음 실행 때 또 안 걸리게 기록
+        return
+
+    date_str = format_date(published_at)
+
+    transcript, fail_reason = get_transcript(vid_id)
+    # 자막 없으면 요약/아카이브 안 함 (자막 있는 것만)
+    if not transcript:
+        tries = bump_transcript_retry(vid_id)
+        if tries < TRANSCRIPT_MAX_RETRIES:
+            # 아직 자동 자막이 안 붙었을 수 있다.
+            # seen에 넣지 않으므로 다음 실행에서 자동으로 재시도된다.
+            stats.pending.append(
+                (title, vid_id, f"자막 대기 {tries}/{TRANSCRIPT_MAX_RETRIES}")
+            )
+            print(f"[자막대기] {title} "
+                  f"({tries}/{TRANSCRIPT_MAX_RETRIES}) {fail_reason}")
+            return
+
+        # 재시도 소진 → 포기. 이때는 조용히 버리지 않고 반드시 알린다.
+        print(f"[SKIP-자막없음] {title} ({fail_reason})")
+        stats.skipped.append(("no-transcript", title, vid_id))
+        log_rejection("no-transcript", title, vid_id, channel)
+        send_telegram(
+            f"⏭ *자막 없어 요약 생략* ({TRANSCRIPT_MAX_RETRIES}회 시도)\n"
+            f"{title}\n{channel}\n"
+            f"📅 {date_str}  ⏱ {duration_str}\n{url}"
+        )
+        save_seen_id(vid_id)
+        return
+
+    summary = summarize_with_gemini(title, transcript)
+
+    # 요약 실패는 대개 모델 과부하(일시적)다. seen에 넣지 않고 보류하면
+    # 다음 실행에서 자동으로 재시도된다. 자막은 이미 확보됐으므로
+    # Supadata 크레딧이 추가로 들지 않는다.
+    if not summary:
+        tries = bump_transcript_retry(vid_id, kind="summary")
+        if tries < SUMMARY_MAX_RETRIES:
+            stats.pending.append(
+                (title, vid_id, f"요약 재시도 {tries}/{SUMMARY_MAX_RETRIES}")
+            )
+            print(f"[요약대기] {title} ({tries}/{SUMMARY_MAX_RETRIES})")
+            return
+        # 재시도 소진 → 요약 없이라도 영상 존재는 알린다
+        print(f"[요약포기] {title}")
+        stats.skipped.append(("summary-failed", title, vid_id))
+        send_telegram(
+            f"⚠️ *요약 실패* ({SUMMARY_MAX_RETRIES}회 시도)\n"
+            f"{title}\n{channel}\n"
+            f"📅 {date_str}  ⏱ {duration_str}\n{url}"
+        )
+        save_seen_id(vid_id)
+        return
+
+    tags = extract_topics(title, transcript)
+
+    # 아카이브에 노트 저장 (누적)
+    save_archive(vid_id, title, channel, date_str, duration_str,
+                 summary, transcript, tags, True)
+
+    # 개별 영상 요약 메시지 발송
+    tag_line = " ".join(f"#{t}" for t in tags) if tags else ""
+    send_telegram(
+        f"🎬 *이선엽 대표* 새 영상 · 노트 추가됨\n\n"
+        f"*{title}*\n채널: {channel}\n"
+        f"📅 {date_str}  ⏱ {duration_str}\n{tag_line}\n\n"
+        f"{clip(to_telegram(summary))}\n\n"
+        f"_※ AI 생성 참고 정보이며 투자 조언이 아닙니다._\n{url}"
+    )
+
+    stats.new_items.append((title, date_str, tags, summary))
+    save_seen_id(vid_id)
+    print(f"[NEW] {title}")
+
+
+def build_status_message(stats):
+    """실행 결과 요약 한 덩어리. 조용히 사라지는 항목이 없게 한다."""
+    now = datetime.now(KST).strftime("%Y년 %m월 %d일 %H:%M")
+    lines = []
+
+    if stats.new_count == 0:
+        lines.append(f"✅ 이선엽 대표 새 영상 없음\n({now} 기준)")
+    else:
+        lines.append(f"📌 이번 실행 요약 ({now})\n신규 {stats.new_count}건 발송 완료")
+
+    if stats.pending:
+        lines.append(f"\n⏳ *보류 {len(stats.pending)}건* (다음 실행에서 재시도)")
+        for title, vid, why in stats.pending[:5]:
+            lines.append(f"• {title[:45]} — {why}\n"
+                         f"  https://www.youtube.com/watch?v={vid}")
+        if len(stats.pending) > 5:
+            lines.append(f"…외 {len(stats.pending) - 5}건")
+
+    if stats.skipped:
+        counts = {}
+        for reason, _, _ in stats.skipped:
+            counts[reason] = counts.get(reason, 0) + 1
+        detail = ", ".join(f"{k} {v}건" for k, v in counts.items())
+        lines.append(f"\n🗑 필터 제외: {detail}")
+
+    if stats.errors:
+        lines.append(f"\n🚨 *처리 실패 {len(stats.errors)}건*")
+        for title, vid, err in stats.errors[:5]:
+            lines.append(f"• {title[:45]}\n  `{err[:60]}`\n"
+                         f"  https://www.youtube.com/watch?v={vid}")
+
+    return clip("\n".join(lines))
+
+
+def main():
+    seen = get_seen_ids()
+    videos = collect_videos()
+    stats = RunStats()
+
+    for item in videos:
+        try:
+            process_video(item, seen, stats)
+        except Exception as e:
+            # 영상 하나가 터져도 나머지는 계속 처리한다.
+            # 예전에는 여기서 예외가 나면 뒤 영상이 전부 유실됐고,
+            # 워크플로는 if: always() 때문에 초록불로 끝나 아무도 몰랐다.
+            vid = item.get("id", {}).get("videoId", "?")
+            title = item.get("snippet", {}).get("title", "?")
+            print(f"[처리 오류] {title[:40]} ({vid}): {type(e).__name__}: {e}")
+            traceback.print_exc()
+            stats.errors.append((title, vid, f"{type(e).__name__}: {e}"))
+
+    # 신규 영상이 있으면 종합 관점을 별도 메시지 1개로 발송
+    if stats.new_count > 0:
+        try:
+            updated = update_perspective(stats.new_items)
+            if updated:
+                send_telegram(
+                    f"🧭 *이선엽 관점 종합* (신규 {stats.new_count}건 반영)\n\n"
+                    f"{clip(to_telegram(updated))}\n\n"
+                    f"_※ AI 생성 참고 정보이며 투자 조언이 아닙니다._"
+                )
+                print("[관점 종합 메시지 발송]")
+        except Exception as e:
+            print(f"[관점 종합 실패] {type(e).__name__}: {e}")
+            stats.errors.append(("관점_종합 갱신", "", f"{type(e).__name__}: {e}"))
+
+    send_telegram(build_status_message(stats))
+    print(f"완료: 신규 {stats.new_count}건 / 보류 {len(stats.pending)}건 / "
+          f"제외 {len(stats.skipped)}건 / 오류 {len(stats.errors)}건")
+
+    # 주기적으로 '놓친 영상이 있는지' 스스로 점검한다.
+    # 알림봇의 가장 큰 위험은 놓치는 것이 아니라 놓친 줄 모르는 것이다.
+    try:
+        if should_run_audit():
+            print("[놓침 점검] 실행")
+            audit_missed()
+    except Exception as e:
+        print(f"[놓침 점검 실패] {type(e).__name__}: {e}")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        # 최상위 크래시. 이게 없으면 봇이 죽어도 텔레그램에 아무것도 안 와서
+        # '오늘은 영상이 없었나 보다'로 오해하게 된다.
+        traceback.print_exc()
+        try:
+            send_telegram(
+                f"🚨 *봇 실행 실패*\n`{type(e).__name__}: {str(e)[:200]}`\n\n"
+                f"이번 실행은 중단됐습니다. Actions 로그를 확인하세요."
+            )
+        except Exception:
+            pass
+        raise
