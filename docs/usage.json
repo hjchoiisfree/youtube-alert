@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-06T13:12:45Z",
+  "generated_at": "2026-10-07T09:14:12Z",
   "month": "2026-10",
   "supadata": {
     "plan": "Free (100/mo)",
@@ -7,14 +7,14 @@
     "max": 100,
     "ledger_used": 0.0,
     "live": true,
-    "burn_per_day": 18.02,
-    "projected_month": 558.5,
+    "burn_per_day": 15.66,
+    "projected_month": 485.5,
     "days_until_empty": 0.0
   },
   "youtube": {
-    "today_units": 1717,
+    "today_units": 861,
     "daily_quota": 10000,
-    "month_units": 10610,
+    "month_units": 11471,
     "resets": "매일 태평양시 자정 (한국시간 오후 4~5시)"
   },
   "llm": [
@@ -22,17 +22,16 @@
       "key": "gemini/gemini-3.1-flash-lite",
       "provider": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "calls": 9,
-      "in_tokens": 8674,
-      "out_tokens": 8,
-      "cost_usd": 0.0022
+      "calls": 12,
+      "in_tokens": 11171,
+      "out_tokens": 10,
+      "cost_usd": 0.0028
     }
   ],
   "daily": [
     {
       "date": "2026-09-06",
-      "youtube": 1630.0,
-      "gemini": 1034.0
+      "youtube": 814.0
     },
     {
       "date": "2026-09-07",
@@ -201,7 +200,13 @@
       "youtube": 1717.0,
       "supadata": 0.0,
       "gemini": 3302.0
+    },
+    {
+      "date": "2026-10-07",
+      "youtube": 861.0,
+      "supadata": 0.0,
+      "gemini": 2499.0
     }
   ],
-  "videos_this_month": 1200
+  "videos_this_month": 1357
 }
