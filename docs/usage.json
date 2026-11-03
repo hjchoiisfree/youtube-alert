@@ -1,20 +1,20 @@
 {
-  "generated_at": "2026-10-11T13:11:44Z",
-  "month": "2026-10",
+  "generated_at": "2026-11-03T01:15:47Z",
+  "month": "2026-11",
   "supadata": {
     "plan": "Free (100/mo)",
-    "used": 4,
+    "used": 67,
     "max": 100,
-    "ledger_used": 3.0,
+    "ledger_used": 12.0,
     "live": true,
-    "burn_per_day": 0.38,
-    "projected_month": 11.8,
-    "days_until_empty": 253.2
+    "burn_per_day": 32.64,
+    "projected_month": 979.2,
+    "days_until_empty": 1.0
   },
   "youtube": {
-    "today_units": 1673,
+    "today_units": 997,
     "daily_quota": 10000,
-    "month_units": 19390,
+    "month_units": 997,
     "resets": "매일 태평양시 자정 (한국시간 오후 4~5시)"
   },
   "llm": [
@@ -22,139 +22,13 @@
       "key": "gemini/gemini-3.1-flash-lite",
       "provider": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "calls": 21,
-      "in_tokens": 37837,
-      "out_tokens": 3307,
-      "cost_usd": 0.0144
+      "calls": 50,
+      "in_tokens": 137671,
+      "out_tokens": 10088,
+      "cost_usd": 0.0495
     }
   ],
   "daily": [
-    {
-      "date": "2026-09-10",
-      "youtube": 104.0
-    },
-    {
-      "date": "2026-09-11",
-      "youtube": 1705.0,
-      "supadata": 1.0,
-      "gemini": 22099.0
-    },
-    {
-      "date": "2026-09-12",
-      "youtube": 1695.0,
-      "gemini": 2213.0
-    },
-    {
-      "date": "2026-09-13",
-      "youtube": 851.0,
-      "gemini": 1271.0
-    },
-    {
-      "date": "2026-09-14",
-      "youtube": 1708.0,
-      "gemini": 12855.0,
-      "supadata": 1.0
-    },
-    {
-      "date": "2026-09-15",
-      "youtube": 1726.0,
-      "supadata": 3.0,
-      "gemini": 52601.0
-    },
-    {
-      "date": "2026-09-16",
-      "youtube": 1740.0,
-      "supadata": 3.0,
-      "gemini": 27693.0
-    },
-    {
-      "date": "2026-09-17",
-      "youtube": 2035.0,
-      "supadata": 1.0,
-      "gemini": 21555.0
-    },
-    {
-      "date": "2026-09-18",
-      "youtube": 1743.0,
-      "supadata": 3.0,
-      "gemini": 26316.0
-    },
-    {
-      "date": "2026-09-19",
-      "youtube": 1757.0
-    },
-    {
-      "date": "2026-09-20",
-      "youtube": 1771.0,
-      "supadata": 2.0,
-      "gemini": 27392.0
-    },
-    {
-      "date": "2026-09-21",
-      "youtube": 1784.0,
-      "gemini": 34160.0,
-      "supadata": 2.0
-    },
-    {
-      "date": "2026-09-22",
-      "youtube": 1763.0,
-      "gemini": 20154.0,
-      "supadata": 2.0
-    },
-    {
-      "date": "2026-09-23",
-      "youtube": 1764.0,
-      "gemini": 6882.0
-    },
-    {
-      "date": "2026-09-24",
-      "youtube": 2041.0,
-      "gemini": 0.0
-    },
-    {
-      "date": "2026-09-25",
-      "youtube": 1712.0
-    },
-    {
-      "date": "2026-09-26",
-      "youtube": 1699.0
-    },
-    {
-      "date": "2026-09-27",
-      "youtube": 1706.0,
-      "supadata": 2.0,
-      "gemini": 28844.0
-    },
-    {
-      "date": "2026-09-28",
-      "youtube": 1703.0,
-      "gemini": 20389.0,
-      "supadata": 93.0
-    },
-    {
-      "date": "2026-09-29",
-      "youtube": 1689.0,
-      "supadata": 2.0,
-      "gemini": 15177.0
-    },
-    {
-      "date": "2026-09-30",
-      "youtube": 1645.0,
-      "supadata": 0.0,
-      "gemini": 4421.0
-    },
-    {
-      "date": "2026-10-01",
-      "youtube": 1972.0,
-      "supadata": 0.0,
-      "gemini": 1002.0
-    },
-    {
-      "date": "2026-10-02",
-      "youtube": 1767.0,
-      "supadata": 0.0,
-      "gemini": 1003.0
-    },
     {
       "date": "2026-10-03",
       "youtube": 1736.0,
@@ -205,7 +79,13 @@
       "date": "2026-10-11",
       "youtube": 1673.0,
       "gemini": 350.0
+    },
+    {
+      "date": "2026-11-03",
+      "youtube": 997.0,
+      "supadata": 12.0,
+      "gemini": 147759.0
     }
   ],
-  "videos_this_month": 1958
+  "videos_this_month": 118
 }
